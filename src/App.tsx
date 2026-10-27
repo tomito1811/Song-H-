@@ -135,8 +135,9 @@ export default function App() {
       mapUrl: '',
       invitationMessage: template.defaultInvitationMessage,
       thankYouMessage: template.defaultThankYouMessage,
-      coverImage: template.preview,
-      galleryImages: [template.preview],
+      // Mẫu minh họa (design.motif) tự vẽ thiệp từ dữ liệu thật, không cần ảnh bìa mẫu.
+      coverImage: template.design.motif ? '' : template.preview,
+      galleryImages: template.design.motif ? [] : [template.preview],
       musicUrl: 'https://assets.mixkit.co/music/preview/mixkit-wedding-waltz-298.mp3',
       design: template.design,
       sectionsVisibility: {
