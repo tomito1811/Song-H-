@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *):not(:where(.theme-light, .theme-light *)));
+
+@layer base {
+  :root {
+    --color-blush: #F6DCE5;
+    --color-rose: #E8B7C8;
+    --color-lavender: #E8DFF5;
+    --color-sage: #DCE8D8;
+    --color-champagne: #E9D8BD;
+    --color-cream: #FFFBF7;
+    --color-dark: #453C45;
+    --color-muted: #827580;
+
+    --bg-page: #FFFBF7;
+    --bg-surface: #FFFFFF;
+    --bg-surface-soft: #FDF7F4;
+    --bg-card: #FFFFFF;
+    --border-subtle: rgba(232, 183, 200, 0.35);
+    --text-main: #453C45;
+    --text-muted: #827580;
+    --text-faint: #A396A1;
+    --accent-pink: #C76A82;
+    --accent-rose: #E8B7C8;
+    --accent-champagne: #E9D8BD;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --bg-page: #1F1A1F;
+    --bg-surface: #2A232A;
+    --bg-surface-soft: #241D24;
+    --bg-card: #2D252D;
+    --border-subtle: rgba(232, 183, 200, 0.16);
+    --text-main: #F5EDE8;
+    --text-muted: #B9A9B4;
+    --text-faint: #7E6E7A;
+    --accent-pink: #E8B7C8;
+    --accent-rose: #E8B7C8;
+    --accent-champagne: #E9D8BD;
+
+    color-scheme: dark;
+  }
+
+  /* Exemption for card templates and invitation preview */
+  .theme-light {
+    color-scheme: light !important;
+  }
+
+  html {
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-main);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .font-serif-luxury {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+
+  .font-script {
+    font-family: 'Great Vibes', cursive;
+  }
+
+  .font-brush {
+    font-family: 'Alex Brush', cursive;
+  }
+}
+
+/* Custom scrollbar for preview panes */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(246, 220, 229, 0.15);
+}
+.dark ::-webkit-scrollbar-track {
+  background: rgba(31, 26, 31, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(232, 183, 200, 0.45);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 183, 200, 0.8);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(232, 183, 200, 0.3);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 183, 200, 0.6);
+}
+
+/* Floating animation */
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1deg);
+  }
+}
+
+.animate-float {
+  animation: floatGentle 5s ease-in-out infinite;
+}
+
+/* Envelope flip & wax seal keyframes */
+@keyframes sealPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 14px rgba(212, 137, 156, 0.35);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(212, 137, 156, 0.55);
+  }
+}
+
+.animate-seal {
+  animation: sealPulse 2.5s ease-in-out infinite;
+}
+
+/* Center focused card on Soft Focus Infinite Ribbon */
+.ribbon-card-focused {
+  border-color: #C76A82 !important;
+  box-shadow: 0 20px 45px -15px rgba(199, 106, 130, 0.35), 0 0 0 1.5px rgba(199, 106, 130, 0.45) !important;
+}
+
+.dark .ribbon-card-focused {
+  border-color: #E8B7C8 !important;
+  box-shadow: 0 20px 45px -15px rgba(232, 183, 200, 0.25), 0 0 0 1.5px rgba(232, 183, 200, 0.4) !important;
+}
+
+/* ========================================================= */
+/* PASTEL LUXURY DARK MODE COMPONENT RULES                  */
+/* ========================================================= */
+
+.dark :is(h1, h2, h3, h4, h5, h6):not(.theme-light, .theme-light *) {
+  color: #F5EDE8;
+}
+
+.dark input:not(.theme-light input):not([type='checkbox']):not([type='radio']),
+.dark textarea:not(.theme-light textarea),
+.dark select:not(.theme-light select) {
+  background-color: #241D24;
+  color: #F5EDE8;
+  border-color: #3D333D;
+}
+
+.dark input:not(.theme-light input):focus,
+.dark textarea:not(.theme-light textarea):focus,
+.dark select:not(.theme-light select):focus {
+  border-color: #E8B7C8;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #7E6E7A;
+}
+
+/* Card surfaces & containers */
+.dark .bg-white:not(.theme-light, .theme-light *) {
+  background-color: #2A232A;
+  border-color: #3D333D;
+}
+
+.dark .bg-\[\#FFFBF7\]:not(.theme-light, .theme-light *) {
+  background-color: #1F1A1F;
+}
+
+.dark .bg-\[\#FAF4F0\]:not(.theme-light, .theme-light *),
+.dark .bg-\[\#F8F5F2\]:not(.theme-light, .theme-light *),
+.dark .bg-\[\#FAF8F5\]:not(.theme-light, .theme-light *),
+.dark .bg-\[\#FAF6F8\]:not(.theme-light, .theme-light *),
+.dark .bg-\[\#FCFBF7\]:not(.theme-light, .theme-light *),
+.dark .bg-\[\#F5EFEA\]:not(.theme-light, .theme-light *) {
+  background-color: #241D24;
+  border-color: #3D333D;
+}
+
+.dark .bg-neutral-50:not(.theme-light, .theme-light *) {
+  background-color: #2E262E;
+}
+
+.dark .bg-neutral-100:not(.theme-light, .theme-light *) {
+  background-color: #241D24;
+}
+
+.dark .hover\:bg-neutral-50:hover:not(.theme-light, .theme-light *) {
+  background-color: #352B35;
+}
+
+.dark .hover\:bg-neutral-100:hover:not(.theme-light, .theme-light *) {
+  background-color: #352B35;
+}
+
+.dark .hover\:bg-neutral-200:hover:not(.theme-light, .theme-light *) {
+  background-color: #423642;
+}
+
+.dark .text-\[\#453C45\]:not(.theme-light, .theme-light *) {
+  color: #F5EDE8;
+}
+
+.dark .text-\[\#827580\]:not(.theme-light, .theme-light *) {
+  color: #B9A9B4;
+}
+
+.dark .border-neutral-100:not(.theme-light, .theme-light *),
+.dark .border-neutral-200:not(.theme-light, .theme-light *),
+.dark .border-neutral-300:not(.theme-light, .theme-light *) {
+  border-color: #3D333D;
+}

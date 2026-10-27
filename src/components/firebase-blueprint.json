@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with plan entitlements and term acceptance",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "plan": { "type": "string", "enum": ["free", "premium", "luxury"] },
+        "planExpiresAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "acceptedTermsAt": { "type": "string" }
+      },
+      "required": ["email", "plan", "createdAt"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Personal wedding website configuration and contents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "slug": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "templateId": { "type": "string" },
+        "brideName": { "type": "string" },
+        "groomName": { "type": "string" },
+        "weddingDate": { "type": "string" },
+        "weddingTime": { "type": "string" },
+        "venueName": { "type": "string" },
+        "venueAddress": { "type": "string" },
+        "invitationMessage": { "type": "string" },
+        "thankYouMessage": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "viewsCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "slug", "userId", "brideName", "groomName", "weddingDate"]
+    },
+    "Guest": {
+      "title": "Guest",
+      "description": "Guest invited to the wedding",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invitationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "rsvpStatus": { "type": "string", "enum": ["pending", "attending", "declined"] },
+        "attendeesCount": { "type": "number" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "invitationId", "name", "rsvpStatus"]
+    },
+    "RSVP": {
+      "title": "RSVP",
+      "description": "Public RSVP confirmations submitted by wedding guests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invitationId": { "type": "string" },
+        "guestName": { "type": "string" },
+        "phone": { "type": "string" },
+        "isAttending": { "type": "boolean" },
+        "attendeesCount": { "type": "number" },
+        "side": { "type": "string" },
+        "dietaryNote": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "invitationId", "guestName", "isAttending", "createdAt"]
+    },
+    "Wish": {
+      "title": "Wish",
+      "description": "Public guestbook wishes for the wedding couple",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invitationId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRelation": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "isApproved": { "type": "boolean" }
+      },
+      "required": ["id", "invitationId", "senderName", "message", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Plan purchase orders tracked with SePay VietQR payment code",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "planId": { "type": "string", "enum": ["premium", "luxury"] },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "cancelled", "manual_approved"] },
+        "bankReference": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "planId", "amount", "status", "bankReference", "createdAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Confirmed transaction records from SePay webhook",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "amount": { "type": "number" },
+        "content": { "type": "string" },
+        "gateway": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "orderId", "amount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and subscription state"
+    },
+    "/invitations/{invitationId}": {
+      "schema": "Invitation",
+      "description": "Wedding invitations created by users"
+    },
+    "/invitations/{invitationId}/guests/{guestId}": {
+      "schema": "Guest",
+      "description": "Guests managed by invitation owner"
+    },
+    "/invitations/{invitationId}/rsvps/{rsvpId}": {
+      "schema": "RSVP",
+      "description": "Public RSVP confirmations for an invitation"
+    },
+    "/invitations/{invitationId}/wishes/{wishId}": {
+      "schema": "Wish",
+      "description": "Public guestbook wishes for an invitation"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Plan purchase orders with dynamic payment code"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Completed payment audit transactions"
+    }
+  }
+}
