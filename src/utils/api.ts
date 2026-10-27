@@ -256,24 +256,35 @@ export async function fetchInvitations(userId?: string): Promise<WeddingInvitati
 
 export async function fetchInvitationBySlug(slug: string): Promise<WeddingInvitation | null> {
   const invCol = collection(db, 'invitations');
-  try {
-    // 1. Search by slug field
-    const q = query(invCol, where('slug', '==', slug), limit(1));
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      const d = snapshot.docs[0];
-      return { ...(d.data() as WeddingInvitation), id: d.id };
-    }
+  const toInv = (d: any): WeddingInvitation => ({ ...(d.data() as WeddingInvitation), id: d.id });
 
-    // 2. Fallback search by doc ID
-    const directDoc = await getDoc(doc(db, 'invitations', slug));
-    if (directDoc.exists()) {
-      return { ...(directDoc.data() as WeddingInvitation), id: directDoc.id };
-    }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `invitations/${slug}`);
+  // 1. Thiệp đã xuất bản (khách chưa đăng nhập chỉ được truy vấn kèm điều kiện status)
+  try {
+    const snap = await getDocs(query(invCol, where('slug', '==', slug), where('status', '==', 'published'), limit(1)));
+    if (!snap.empty) return toInv(snap.docs[0]);
+  } catch (err) {
+    console.warn('Không truy vấn được thiệp đã xuất bản:', err);
   }
+
+  // 2. Chủ thiệp đang đăng nhập: xem cả bản nháp của mình
+  const uid = auth.currentUser?.uid;
+  if (uid) {
+    try {
+      const snap = await getDocs(query(invCol, where('slug', '==', slug), where('userId', '==', uid), limit(1)));
+      if (!snap.empty) return toInv(snap.docs[0]);
+    } catch (err) {
+      console.warn('Không truy vấn được thiệp của chủ:', err);
+    }
+  }
+
+  // 3. Dự phòng: mở theo ID thiệp
+  try {
+    const directDoc = await getDoc(doc(db, 'invitations', slug));
+    if (directDoc.exists()) return toInv(directDoc);
+  } catch {
+    /* không có quyền hoặc không tồn tại */
+  }
+  return null;
 }
 
 export async function fetchInvitationById(id: string): Promise<WeddingInvitation | null> {
@@ -619,7 +630,14 @@ export async function fetchWishes(slugOrId: string): Promise<Wish[]> {
 
   try {
     const colRef = collection(db, 'invitations', invId, 'wishes');
-    const snapshot = await getDocs(colRef);
+    let snapshot;
+    try {
+      // Chủ thiệp: đọc tất cả lời chúc
+      snapshot = await getDocs(colRef);
+    } catch {
+      // Khách: chỉ được đọc lời chúc đã duyệt
+      snapshot = await getDocs(query(colRef, where('isApproved', '==', true)));
+    }
     const wishes: Wish[] = [];
     snapshot.forEach((d) => wishes.push({ ...(d.data() as Wish), id: d.id }));
     wishes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
