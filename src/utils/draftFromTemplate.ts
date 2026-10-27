@@ -1,5 +1,6 @@
 import { WeddingInvitation, WeddingTemplate } from '../types/wedding';
 import { WEDDING_TRACKS } from '../data/music';
+import { sampleAlbumFor } from '../data/sampleAlbum';
 
 const SAMPLE_GALLERY = [
   'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1000&q=75',
@@ -43,7 +44,7 @@ export function draftFromTemplate(
     thankYouMessage: template.defaultThankYouMessage,
     // Mẫu minh họa (design.motif) tự vẽ thiệp từ dữ liệu thật, không cần ảnh bìa mẫu.
     coverImage: isArt ? '' : template.preview,
-    galleryImages: sample ? SAMPLE_GALLERY : isArt ? [] : [template.preview],
+    galleryImages: sample ? [...sampleAlbumFor(template), ...SAMPLE_GALLERY.slice(0, 2)] : isArt ? [] : [template.preview],
     musicUrl: WEDDING_TRACKS[0].url,
     design: { ...template.design, musicTitle: WEDDING_TRACKS[0].title },
     sectionsVisibility: {
