@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { WeddingTemplate } from '../types/wedding';
 import { WEDDING_TEMPLATES } from '../data/templates';
+import { TemplateFilterBar, filterTemplates, isPublishedTemplate, CollectionFilter, ColorFilter, templateSwatches } from './TemplateFilterBar';
 import { PRICING_PLANS } from '../data/pricing';
 import { formatVND } from '../utils/formatters';
 import { SoftFocusRibbon } from './SoftFocusRibbon';
@@ -43,7 +44,36 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [previewModalTemplate, setPreviewModalTemplate] = useState<WeddingTemplate | null>(null);
 
   // Featured 4 curated templates
-  const featuredTemplates = WEDDING_TEMPLATES.slice(0, 4);
+  const publishedTemplates = WEDDING_TEMPLATES.filter(isPublishedTemplate);
+  // 4 mẫu tiêu biểu thuộc 4 chủ đề khác nhau (ưu tiên mẫu featured của bộ sưu tập mới).
+  const featuredTemplates = (() => {
+    const picked: WeddingTemplate[] = [];
+    const seen = new Set<string>();
+    for (const t of publishedTemplates) {
+      if (!t.featured || !t.collection || seen.has(t.collection)) continue;
+      if (['truyen-thong', 'hoa-la', 'hoang-gia', 'nghe-thuat'].includes(t.collection)) {
+        picked.push(t);
+        seen.add(t.collection);
+      }
+    }
+    for (const t of publishedTemplates) if (picked.length < 4 && !picked.includes(t)) picked.push(t);
+    return picked.slice(0, 4);
+  })();
+
+  // Dải Soft Focus Ribbon: mẫu nổi bật trước, lọc theo chủ đề / màu.
+  const [ribbonCollection, setRibbonCollection] = useState<CollectionFilter>('all');
+  const [ribbonColor, setRibbonColor] = useState<ColorFilter>('all');
+  const ribbonTemplates = React.useMemo(() => {
+    const filtered = filterTemplates(publishedTemplates, ribbonCollection, ribbonColor);
+    const base =
+      ribbonCollection === 'all' && ribbonColor === 'all'
+        ? [...filtered.filter((t) => t.featured), ...filtered.filter((t) => t.collection && !t.featured)]
+        : filtered;
+    // Dải chạy vô tận cần đủ thẻ để lấp kín chiều ngang.
+    let list = base.length ? base : publishedTemplates.slice(0, 8);
+    while (list.length < 7) list = list.concat(base.length ? base : list);
+    return list;
+  }, [ribbonCollection, ribbonColor]);
 
   const styleCategories = [
     { id: 'pastel', name: 'Pastel Romantic', count: '6 mẫu', color: '#F6DCE5', darkColor: '#36242B' },
@@ -288,7 +318,20 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 2. FLAGSHIP COMPONENT: SOFT FOCUS INFINITE RIBBON          */}
       {/* ========================================================= */}
       <SoftFocusRibbon
-        templates={WEDDING_TEMPLATES}
+        key={`${ribbonCollection}-${ribbonColor}`}
+        templates={ribbonTemplates}
+        toolbar={
+          <TemplateFilterBar
+            templates={publishedTemplates}
+            collection={ribbonCollection}
+            color={ribbonColor}
+            onCollectionChange={setRibbonCollection}
+            onColorChange={setRibbonColor}
+            compact
+          />
+        }
+        onViewAll={() => onNavigate('templates')}
+        totalCount={publishedTemplates.length}
         onSelectTemplate={onSelectTemplate}
         onPreviewTemplate={(tpl) => setPreviewModalTemplate(tpl)}
         speed={30}
@@ -313,7 +356,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             onClick={() => onNavigate('templates')}
             className="text-xs font-bold text-[#C76A82] dark:text-[#E8B7C8] hover:text-[#B0596E] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
-            <span>Xem tất cả 22+ mẫu thiệp</span>
+            <span>Xem tất cả {publishedTemplates.length} mẫu thiệp</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -698,9 +741,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                       Bảng màu đặc trưng:
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full border border-neutral-200" style={{ backgroundColor: previewModalTemplate.colorPalette.primary }} />
-                      <span className="w-5 h-5 rounded-full border border-neutral-200" style={{ backgroundColor: previewModalTemplate.colorPalette.secondary }} />
-                      <span className="w-5 h-5 rounded-full border border-neutral-200" style={{ backgroundColor: previewModalTemplate.colorPalette.background }} />
+                      <span className="w-5 h-5 rounded-full border border-neutral-200" style={{ backgroundColor: templateSwatches(previewModalTemplate)[0] }} />
+                      <span className="w-5 h-5 rounded-full border border-neutral-200" style={{ backgroundColor: templateSwatches(previewModalTemplate)[1] }} />
+                      <span className="w-5 h-5 rounded-full border border-neutral-200" style={{ backgroundColor: templateSwatches(previewModalTemplate)[2] }} />
                     </div>
                   </div>
 

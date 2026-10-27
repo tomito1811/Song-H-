@@ -23,6 +23,7 @@ import { WeddingInvitation, Wish } from '../types/wedding';
 import { calculateCountdown, formatDateVN, generateQrDataUrl } from '../utils/formatters';
 import { submitRsvp, fetchWishes, submitWish } from '../utils/api';
 import { WatermarkOverlay } from './WatermarkOverlay';
+import { InvitationArtCard } from './templateArt/InvitationArtCard';
 
 interface PublicInvitationViewProps {
   invitation: WeddingInvitation;
@@ -176,6 +177,16 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
   };
 
   const { palette } = invitation.design;
+  const motif = invitation.design.motif;
+  const artCardProps = {
+    groomName: invitation.groomName,
+    brideName: invitation.brideName,
+    weddingDate: invitation.weddingDate,
+    weddingTime: invitation.weddingTime,
+    lunarDate: invitation.lunarDate,
+    venueName: invitation.venueName,
+    venueAddress: invitation.venueAddress,
+  };
 
   return (
     <div
@@ -225,8 +236,31 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
       {/* 1. ENVELOPE OPENING CURTAIN (Wax seal + envelope animation) */}
       {/* ========================================================= */}
       {!isOpened ? (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-[#FFFBF7] to-[#F6DCE5]/40">
+        <div
+          className={`min-h-screen flex items-center justify-center p-4 ${motif ? '' : 'bg-gradient-to-b from-[#FFFBF7] to-[#F6DCE5]/40'}`}
+          style={motif ? { background: `linear-gradient(180deg, ${palette.background}, ${palette.surface})` } : undefined}
+        >
           <div className="w-full max-w-md text-center">
+            {motif ? (
+              /* Thiệp minh họa (bộ sưu tập cao cấp): hiển thị chính tấm thiệp, chạm để mở */
+              <button
+                type="button"
+                onClick={handleOpenEnvelope}
+                className="group block w-full max-w-[380px] mx-auto cursor-pointer text-center focus-visible:outline-2 focus-visible:outline-offset-4"
+                aria-label="Mở thiệp cưới"
+              >
+                <InvitationArtCard
+                  motif={motif}
+                  {...artCardProps}
+                  className="rounded-2xl shadow-2xl transition-transform duration-300 group-hover:-translate-y-1.5"
+                />
+                <span className="mt-5 text-xs font-semibold uppercase tracking-wider block" style={{ color: palette.primary }}>
+                  Chạm để mở thiệp cưới
+                </span>
+                <ChevronDown className="w-4 h-4 mx-auto mt-1 animate-bounce" style={{ color: palette.primary }} />
+              </button>
+            ) : (
+            <>
             {/* Romantic Pre-Text */}
             <div className="mb-8">
               <span className="font-script text-3xl sm:text-4xl text-[#C76A82] block mb-2">
@@ -285,6 +319,9 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
               </div>
             </div>
 
+            </>
+            )}
+
             {onBackToHome && (
               <button
                 onClick={onBackToHome}
@@ -329,10 +366,32 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
               <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#F6DCE5]/30 to-transparent pointer-events-none" />
 
               <div className="relative z-10 space-y-4">
-                <span className="text-xs uppercase tracking-widest text-[#827580] font-semibold block">
-                  Lễ Thành Hôn
-                </span>
+                {!motif && (
+                  <span className="text-xs uppercase tracking-widest text-[#827580] font-semibold block">
+                    Lễ Thành Hôn
+                  </span>
+                )}
 
+                {motif ? (
+                  <>
+                    <InvitationArtCard
+                      motif={motif}
+                      {...artCardProps}
+                      className="mx-auto w-full max-w-sm rounded-2xl shadow-xl"
+                    />
+                    {invitation.coverImage && (
+                      <div className="relative mx-auto mt-6 w-full max-w-sm rounded-2xl overflow-hidden shadow-xl border-4 border-white aspect-[3/4]">
+                        <img
+                          src={invitation.coverImage}
+                          alt="Cô dâu và chú rể"
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                <>
                 <h1
                   className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight"
                   style={{
@@ -364,6 +423,9 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                     </div>
                   </div>
                 </div>
+
+                </>
+                )}
 
                 {/* Romantic Message */}
                 <div className="mt-8 max-w-md mx-auto px-4">

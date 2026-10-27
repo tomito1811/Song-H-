@@ -23,6 +23,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { WeddingInvitation, Guest, Order, User } from '../types/wedding';
+import { InvitationArtCard } from './templateArt/InvitationArtCard';
 import {
   fetchInvitations,
   deleteInvitation,
@@ -392,12 +393,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div>
                     {/* Cover Preview Image */}
                     <div className="relative aspect-[16/9] overflow-hidden bg-neutral-100">
-                      <img
-                        src={inv.coverImage}
-                        alt={inv.title}
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
+                      {!inv.coverImage && inv.design?.motif ? (
+                        <div className="w-full h-full flex items-start justify-center" style={{ background: inv.design.motif.ground }}>
+                          <InvitationArtCard
+                            motif={inv.design.motif}
+                            groomName={inv.groomName}
+                            brideName={inv.brideName}
+                            weddingDate={inv.weddingDate}
+                            weddingTime={inv.weddingTime}
+                            venueName={inv.venueName}
+                            className="w-[56%] -mt-2"
+                          />
+                        </div>
+                      ) : (
+                        <img
+                          src={inv.coverImage}
+                          alt={inv.title}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
                       <div className="absolute top-3 left-3">
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${

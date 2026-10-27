@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Sparkles, Eye, Heart, ArrowLeft, ArrowRight, Play, Pause } from 'lucide-react';
 import { WeddingTemplate } from '../types/wedding';
+import { TEMPLATE_COLLECTIONS } from '../data/premiumTemplates';
 
 interface SoftFocusRibbonProps {
   templates: WeddingTemplate[];
@@ -9,6 +10,11 @@ interface SoftFocusRibbonProps {
   speed?: number; // pixels per second (default 28)
   title?: string;
   subtitle?: string;
+  /** Bộ lọc chủ đề / màu hiển thị dưới tiêu đề. */
+  toolbar?: React.ReactNode;
+  /** Mở thư viện đầy đủ. */
+  onViewAll?: () => void;
+  totalCount?: number;
 }
 
 export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
@@ -18,6 +24,9 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
   speed = 28,
   title = 'Dải Trưng Bày Mẫu Thiệp Độc Bản',
   subtitle = 'Công nghệ Soft Focus Infinite Ribbon — Tự động chuyển động chậm rãi và lấy nét theo tâm',
+  toolbar,
+  onViewAll,
+  totalCount,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -33,12 +42,14 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [centerTemplate, setCenterTemplate] = useState<WeddingTemplate | null>(null);
+  // Kích thước thẻ dùng khi render (đồng bộ với animState để tránh thẻ chồng nhau trên mobile).
+  const [cardW, setCardW] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 192 : 228));
 
   // Animation & geometry state (stored in refs for 60fps bypass of React render cycles)
   const animState = useRef({
     x: 0,
-    stride: 284, // cardWidth + gap
-    cardWidth: 260,
+    stride: 252, // cardWidth + gap
+    cardWidth: 228,
     gap: 24,
     containerWidth: 1200,
     singleCycleWidth: 0,
@@ -60,7 +71,8 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
     const cw = containerRef.current.clientWidth;
     const isMobile = window.innerWidth < 768;
 
-    const cardWidth = isMobile ? 210 : 268;
+    // Khung ảnh giữ đúng tỷ lệ 3:4 của thiệp (không cắt mất viền / chữ).
+    const cardWidth = isMobile ? 192 : 228;
     const gap = isMobile ? 16 : 24;
     const stride = cardWidth + gap;
     const singleCycleWidth = templates.length * stride;
@@ -70,6 +82,7 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
     animState.current.gap = gap;
     animState.current.stride = stride;
     animState.current.singleCycleWidth = singleCycleWidth;
+    setCardW(cardWidth);
   }, [templates.length]);
 
   // Check prefers-reduced-motion
@@ -280,7 +293,7 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
               <Sparkles className="w-3.5 h-3.5" />
               <span>Soft Focus Infinite Ribbon</span>
               <span aria-hidden="true">·</span>
-              <span>22+ Mẫu Độc Bản</span>
+              <span>{totalCount ? `${totalCount} mẫu` : 'Mẫu Độc Bản'}</span>
             </div>
             <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-[#453C45] dark:text-[#F5EDE8] tracking-tight">
               {title}
@@ -331,6 +344,8 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
         </div>
       </div>
 
+      {toolbar && <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 md:-mt-6 mb-2">{toolbar}</div>}
+
       {/* Center Focus Vignette / Indicator Bar (Subtle luxury framing) */}
       <div className="relative w-full">
         {/* Soft edge gradients for cinematic fade out */}
@@ -354,7 +369,7 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
           onMouseLeave={() => setIsHovered(false)}
           className="relative w-full overflow-hidden select-none cursor-grab active:cursor-grabbing touch-pan-y py-6"
           style={{
-            height: '460px',
+            height: `${Math.round((cardW * 4) / 3) + 150}px`,
             touchAction: 'pan-y',
           }}
         >
@@ -362,7 +377,7 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
             ref={trackRef}
             className="flex items-center absolute top-4 left-0 will-change-transform"
             style={{
-              gap: `${animState.current.gap}px`,
+              gap: `${cardW < 200 ? 16 : 24}px`,
             }}
           >
             {repeatedTemplates.map((template, idx) => {
@@ -381,12 +396,12 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
                   }}
                   className="group relative shrink-0 rounded-3xl bg-white dark:bg-[#2A232A] border border-[#E8B7C8]/40 dark:border-[#3D333D] overflow-hidden shadow-md hover:shadow-2xl transition-[box-shadow,border-color] duration-300 cursor-pointer will-change-transform flex flex-col"
                   style={{
-                    width: `${animState.current.cardWidth}px`,
-                    height: '410px',
+                    width: `${cardW}px`,
+                    height: `${Math.round((cardW * 4) / 3) + 104}px`,
                   }}
                 >
                   {/* Wedding Card Image Frame (3:4 ratio) */}
-                  <div className="relative w-full h-[290px] overflow-hidden bg-[#FAF4F0] dark:bg-[#201A20]">
+                  <div className="relative w-full aspect-[3/4] shrink-0 overflow-hidden bg-[#FAF4F0] dark:bg-[#201A20]">
                     <img
                       src={template.thumbnail}
                       alt={`Mẫu thiệp ${template.name}`}
@@ -406,7 +421,7 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
                     {/* Category subtle label */}
                     <div className="absolute top-3.5 right-3.5 z-10">
                       <span className="px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide bg-black/40 text-white backdrop-blur-xs">
-                        {template.style.split(' ')[0]}
+                        {template.collection ? TEMPLATE_COLLECTIONS.find((c) => c.id === template.collection)?.short : template.style.split(' ')[0]}
                       </span>
                     </div>
 
@@ -436,7 +451,7 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
                       <div className="flex items-center gap-1.5 text-[11px] text-[#827580] dark:text-[#B9A9B4] mb-1">
                         <span>{template.style}</span>
                         <span aria-hidden="true">·</span>
-                        <span className="capitalize">{template.category}</span>
+                        <span className="capitalize">{template.colorName || template.category}</span>
                       </div>
                       <h3 className="font-heading text-base font-bold text-[#453C45] dark:text-[#F5EDE8] truncate leading-tight group-hover:text-[#C76A82] dark:group-hover:text-[#E8B7C8] transition-colors">
                         {template.name}
@@ -495,6 +510,18 @@ export const SoftFocusRibbon: React.FC<SoftFocusRibbonProps> = ({
               <span>Tạo Với Mẫu Này</span>
             </button>
           </div>
+        </div>
+      )}
+      {onViewAll && (
+        <div className="mt-6 flex justify-center px-4">
+          <button
+            type="button"
+            onClick={onViewAll}
+            className="px-5 py-2.5 rounded-full border border-[#C76A82] text-[#C76A82] dark:text-[#E8B7C8] dark:border-[#E8B7C8] text-xs font-bold hover:bg-[#C76A82] hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            Xem tất cả mẫu thiệp{totalCount ? ` (${totalCount})` : ''}
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </section>

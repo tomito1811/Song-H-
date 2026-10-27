@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Search, Sparkles, Filter, Check, Eye, Heart, ArrowRight, X } from 'lucide-react';
 import { WeddingTemplate, TemplateCategory } from '../types/wedding';
 import { WEDDING_TEMPLATES } from '../data/templates';
+import { TemplateFilterBar, filterTemplates, isPublishedTemplate, CollectionFilter, ColorFilter, templateSwatches } from './TemplateFilterBar';
+
+const PUBLISHED = WEDDING_TEMPLATES.filter(isPublishedTemplate);
 
 interface TemplateGalleryProps {
   onSelectTemplate: (template: WeddingTemplate) => void;
@@ -16,6 +19,8 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   const [tierFilter, setTierFilter] = useState<'all' | 'free' | 'premium'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewModalTemplate, setPreviewModalTemplate] = useState<WeddingTemplate | null>(null);
+  const [collectionFilter, setCollectionFilter] = useState<CollectionFilter>('all');
+  const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
 
   const categories = [
     { id: 'all', label: 'Tất cả mẫu' },
@@ -33,7 +38,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   ];
 
   const filteredTemplates = useMemo(() => {
-    return WEDDING_TEMPLATES.filter((tpl) => {
+    return filterTemplates(PUBLISHED, collectionFilter, colorFilter).filter((tpl) => {
       // Category filter
       if (selectedCategory !== 'all' && tpl.category !== selectedCategory) {
         return false;
@@ -47,12 +52,13 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         return (
           tpl.name.toLowerCase().includes(q) ||
           tpl.style.toLowerCase().includes(q) ||
+          (tpl.colorName || '').toLowerCase().includes(q) ||
           tpl.description.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [selectedCategory, tierFilter, searchQuery]);
+  }, [selectedCategory, tierFilter, searchQuery, collectionFilter, colorFilter]);
 
   return (
     <div className="py-10 md:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto transition-colors duration-200">
@@ -61,7 +67,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#C76A82] dark:text-[#E8B7C8] mb-2">
           <span>Bộ Sưu Tập Mẫu Thiệp 2026</span>
           <span aria-hidden="true">·</span>
-          <span>22+ Thiết Kế Độc Bản</span>
+          <span>{PUBLISHED.length} Thiết Kế</span>
         </div>
         <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-[#453C45] dark:text-[#F5EDE8] tracking-tight mb-4">
           Thư Viện Mẫu Thiệp Cưới Sang Trọng
@@ -99,6 +105,13 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
       {/* Search & Filters */}
       <div className="space-y-4 mb-10">
+        <TemplateFilterBar
+          templates={PUBLISHED}
+          collection={collectionFilter}
+          color={colorFilter}
+          onCollectionChange={setCollectionFilter}
+          onColorChange={setColorFilter}
+        />
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Search Input */}
           <div className="relative w-full md:w-80">
@@ -130,7 +143,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                   : 'text-[#827580] dark:text-[#B9A9B4] hover:text-[#453C45] dark:hover:text-[#F5EDE8]'
               }`}
             >
-              Tất cả ({WEDDING_TEMPLATES.length})
+              Tất cả ({PUBLISHED.length})
             </button>
             <button
               onClick={() => setTierFilter('free')}
@@ -184,6 +197,8 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
               setSelectedCategory('all');
               setTierFilter('all');
               setSearchQuery('');
+              setCollectionFilter('all');
+              setColorFilter('all');
             }}
             className="text-xs font-semibold text-[#C76A82] dark:text-[#E8B7C8] underline cursor-pointer"
           >
@@ -217,9 +232,9 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
                 {/* Color preview dots */}
                 <div className="absolute bottom-3.5 left-3.5 flex items-center -space-x-1 p-1 bg-white/80 dark:bg-[#1F1A1F]/80 backdrop-blur-xs rounded-full border border-black/5 dark:border-white/5">
-                  <span className="w-3.5 h-3.5 rounded-full border border-white dark:border-[#2A232A]" style={{ backgroundColor: tpl.colorPalette.primary }} />
-                  <span className="w-3.5 h-3.5 rounded-full border border-white dark:border-[#2A232A]" style={{ backgroundColor: tpl.colorPalette.secondary }} />
-                  <span className="w-3.5 h-3.5 rounded-full border border-white dark:border-[#2A232A]" style={{ backgroundColor: tpl.colorPalette.background }} />
+                  <span className="w-3.5 h-3.5 rounded-full border border-white dark:border-[#2A232A]" style={{ backgroundColor: templateSwatches(tpl)[0] }} />
+                  <span className="w-3.5 h-3.5 rounded-full border border-white dark:border-[#2A232A]" style={{ backgroundColor: templateSwatches(tpl)[1] }} />
+                  <span className="w-3.5 h-3.5 rounded-full border border-white dark:border-[#2A232A]" style={{ backgroundColor: templateSwatches(tpl)[2] }} />
                 </div>
 
                 {/* Hover Quick Actions */}
@@ -325,9 +340,9 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                       Bảng màu chủ đạo:
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: previewModalTemplate.colorPalette.primary }} />
-                      <span className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: previewModalTemplate.colorPalette.secondary }} />
-                      <span className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: previewModalTemplate.colorPalette.background }} />
+                      <span className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: templateSwatches(previewModalTemplate)[0] }} />
+                      <span className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: templateSwatches(previewModalTemplate)[1] }} />
+                      <span className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: templateSwatches(previewModalTemplate)[2] }} />
                     </div>
                   </div>
 
