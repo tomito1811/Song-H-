@@ -1,6 +1,8 @@
 import { WeddingTemplate } from '../types/wedding';
+import { PREMIUM_COLLECTION } from './premiumTemplates';
 
-export const WEDDING_TEMPLATES: WeddingTemplate[] = [
+// Các mẫu gốc (giữ nguyên, không chỉnh sửa).
+const LEGACY_TEMPLATES: WeddingTemplate[] = [
   {
     id: 'tpl-pastel-01',
     name: 'Hương Sắc Mùa Yêu',
@@ -904,3 +906,9 @@ export const WEDDING_TEMPLATES: WeddingTemplate[] = [
     defaultThankYouMessage: 'Cảm ơn bạn đã không quản đường xa đến chung vui cùng chúng tôi.',
   },
 ];
+
+/**
+ * Toàn bộ thư viện mẫu: mẫu gốc + bộ sưu tập cao cấp (chỉ các mẫu đã xuất bản).
+ * Bộ sưu tập mới được đặt lên đầu để hiển thị nổi bật.
+ */
+export const WEDDING_TEMPLATES: WeddingTemplate[] = [...PREMIUM_COLLECTION, ...LEGACY_TEMPLATES];
