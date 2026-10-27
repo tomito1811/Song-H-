@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Menu, X, Heart, ShieldCheck, User, LogOut } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 import { auth, fbSignOut } from '../firebase';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -96,6 +97,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Desktop Theme Switcher */}
             <ThemeToggle className="hidden sm:inline-block" />
+
+            {currentUser?.id && (
+              <NotificationBell ownerId={currentUser.id} onOpenAll={() => onNavigate('dashboard')} />
+            )}
 
             {currentUser ? (
               <div className="hidden sm:flex items-center gap-2">

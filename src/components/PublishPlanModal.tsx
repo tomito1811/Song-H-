@@ -25,6 +25,8 @@ interface PublishPlanModalProps {
   invitation: WeddingInvitation;
   onSelectPlan: (planId: 'free' | 'premium' | 'luxury') => void;
   isLoading?: boolean;
+  /** Tài khoản còn lượt thiệp miễn phí (mỗi Gmail 1 thiệp, đầy đủ tính năng). */
+  freeTrialAvailable?: boolean;
 }
 
 export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
@@ -33,6 +35,7 @@ export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
   invitation,
   onSelectPlan,
   isLoading = false,
+  freeTrialAvailable = true,
 }) => {
   if (!isOpen) return null;
 
@@ -51,18 +54,15 @@ export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
   const hasGiftBox = Boolean(invitation.giftBank?.enabled);
   const hasRsvp = Boolean(invitation.sectionsVisibility?.rsvp);
 
-  // Ineligibility check for Free plan
+  // Mỗi tài khoản Gmail được 1 thiệp miễn phí đầy đủ tính năng.
   const freeDisqualifiers: string[] = [];
-  if (isPremiumTemplate) freeDisqualifiers.push('Mẫu thiệp cao cấp');
-  if (photoCount > 5) freeDisqualifiers.push(`Album ảnh cưới (${photoCount}/5 ảnh)`);
-  if (hasMusic) freeDisqualifiers.push('Nhạc nền đám cưới');
-  if (hasGiftBox) freeDisqualifiers.push('Hộp mừng cưới VietQR');
+  if (!freeTrialAvailable) freeDisqualifiers.push('tài khoản đã dùng lượt thiệp miễn phí');
 
   const isFreeEligible = freeDisqualifiers.length === 0;
 
   // Recommended plan determination
   const recommendedPlanId: 'free' | 'premium' | 'luxury' =
-    photoCount > 25 ? 'luxury' : isFreeEligible ? 'free' : 'premium';
+    isFreeEligible ? 'free' : photoCount > 25 ? 'luxury' : 'premium';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
@@ -190,7 +190,7 @@ export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
                         <span>Chưa đủ điều kiện:</span>
                       </div>
                       <p className="leading-snug">
-                        Thiệp đang dùng: {freeDisqualifiers.join(', ')}. Hãy nâng cấp để xuất bản.
+                        Bạn đã {freeDisqualifiers.join(', ')}. Hãy chọn gói trả phí để xuất bản thêm thiệp.
                       </p>
                     </div>
                   )}
@@ -220,7 +220,7 @@ export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
                         : 'border border-[#C76A82] dark:border-[#E8B7C8] text-[#C76A82] dark:text-[#E8B7C8] hover:bg-[#F6DCE5]/30'
                     }`}
                   >
-                    <span>{isFree ? 'Xuất Bản Miễn Phí' : `Chọn Gói ${plan.name}`}</span>
+                    <span>{isFree ? 'Dùng Lượt Miễn Phí & Xuất Bản' : `Chọn Gói ${plan.name}`}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

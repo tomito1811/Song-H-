@@ -19,24 +19,42 @@ import {
   ExternalLink,
   Download
 } from 'lucide-react';
-import { WeddingInvitation, Wish } from '../types/wedding';
+import { WeddingInvitation, Wish, Guest } from '../types/wedding';
 import { calculateCountdown, formatDateVN, generateQrDataUrl } from '../utils/formatters';
 import { submitRsvp, fetchWishes, submitWish } from '../utils/api';
 import { WatermarkOverlay } from './WatermarkOverlay';
 import { InvitationArtCard } from './templateArt/InvitationArtCard';
+import { GallerySlideshow, defaultEffectForTemplate } from './GallerySlideshow';
+import { SignaturePad } from './SignaturePad';
+import { fetchGuestForInvite, markGuestViewed, submitGift } from '../utils/engagement';
+import { findTrackByUrl } from '../data/music';
 
 interface PublicInvitationViewProps {
   invitation: WeddingInvitation;
   onBackToHome?: () => void;
   isPreviewMode?: boolean;
+  /** ID khách từ link riêng (?g=...) */
+  guestId?: string;
+  /** Bản xem trước / demo: hiển thị như thật nhưng không ghi dữ liệu. */
+  sandboxLabel?: string;
 }
 
 export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
   invitation,
   onBackToHome,
   isPreviewMode = false,
+  guestId,
+  sandboxLabel,
 }) => {
+  // Không ghi dữ liệu thật khi xem trước trong trình soạn, bản xem trước QR, hoặc mẫu demo
+  const noWrite = isPreviewMode || Boolean(sandboxLabel);
   const [isOpened, setIsOpened] = useState(isPreviewMode);
+  const [guest, setGuest] = useState<Guest | null>(null);
+  const [wishSignature, setWishSignature] = useState<string | null>(null);
+  const [showSignature, setShowSignature] = useState(true);
+  const [giftForm, setGiftForm] = useState({ senderName: '', amount: '', message: '' });
+  const [giftLoading, setGiftLoading] = useState(false);
+  const [giftSuccess, setGiftSuccess] = useState(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [countdown, setCountdown] = useState(calculateCountdown(invitation.weddingDate, invitation.weddingTime));
   const [wishes, setWishes] = useState<Wish[]>([]);
@@ -79,10 +97,35 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
 
   // Load Wishes
   useEffect(() => {
-    if (!isPreviewMode && invitation.slug) {
+    if (!noWrite && invitation.slug) {
       fetchWishes(invitation.slug).then(data => setWishes(data)).catch(() => {});
     }
-  }, [invitation.slug, isPreviewMode]);
+  }, [invitation.slug, noWrite]);
+
+  // Link riêng của khách: tải thông tin & ghi nhận đã xem
+  useEffect(() => {
+    if (!guestId || isPreviewMode) return;
+    let cancelled = false;
+    fetchGuestForInvite(invitation.id, guestId).then((g) => {
+      if (cancelled || !g) return;
+      setGuest(g);
+      setRsvpData((prev) => ({
+        ...prev,
+        guestName: prev.guestName || g.name,
+        phone: prev.phone || g.phone || '',
+        attendeesCount: g.attendeesCount || prev.attendeesCount,
+        side: g.group === 'groom_friends' ? 'groom' : g.group === 'bride_friends' ? 'bride' : prev.side,
+      }));
+      setWishData((prev) => ({ ...prev, senderName: prev.senderName || g.name }));
+      setGiftForm((prev) => ({ ...prev, senderName: prev.senderName || g.name }));
+      if (g.rsvpStatus !== 'pending') setRsvpSuccess(true);
+      if (g.giftSent) setGiftSuccess(true);
+      if (!sandboxLabel) markGuestViewed(invitation, g);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [guestId, invitation.id, isPreviewMode, sandboxLabel]);
 
   // Generate QR code for sharing
   useEffect(() => {
@@ -119,8 +162,8 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
     if (!rsvpData.guestName.trim()) return;
     setRsvpLoading(true);
     try {
-      if (!isPreviewMode && invitation.slug) {
-        await submitRsvp(invitation.slug, rsvpData);
+      if (!noWrite && invitation.slug) {
+        await submitRsvp(invitation.slug, rsvpData, guest?.id);
         // Refresh wishes in case a message was attached
         const updatedWishes = await fetchWishes(invitation.slug);
         setWishes(updatedWishes);
@@ -140,8 +183,12 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
     if (!wishData.senderName.trim() || !wishData.message.trim()) return;
     setWishLoading(true);
     try {
-      if (!isPreviewMode && invitation.slug) {
-        const newWish = await submitWish(invitation.slug, wishData);
+      if (!noWrite && invitation.slug) {
+        const newWish = await submitWish(
+          invitation.slug,
+          { ...wishData, signature: wishSignature || undefined },
+          guest?.id
+        );
         setWishes([newWish, ...wishes]);
       } else {
         // Preview dummy
@@ -152,13 +199,17 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
             senderName: wishData.senderName,
             senderRelation: wishData.senderRelation,
             message: wishData.message,
+            signature: wishSignature || undefined,
             createdAt: new Date().toISOString(),
             isApproved: true,
           },
           ...wishes,
         ]);
       }
-      setWishData({ senderName: '', senderRelation: 'Bạn bè', message: '' });
+      setWishData({ senderName: guest?.name || '', senderRelation: 'Bạn bè', message: '' });
+      setWishSignature(null);
+      setShowSignature(false);
+      setTimeout(() => setShowSignature(true), 50);
       setWishSuccess(true);
       setTimeout(() => setWishSuccess(false), 4000);
     } catch (err) {
@@ -166,6 +217,32 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
       alert('Không thể gửi lời chúc lúc này.');
     } finally {
       setWishLoading(false);
+    }
+  };
+
+  // Khách xác nhận đã gửi quà mừng → thông báo cho chủ thiệp
+  const handleGiftSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!giftForm.senderName.trim()) return;
+    setGiftLoading(true);
+    try {
+      if (!noWrite) {
+        await submitGift(
+          invitation,
+          {
+            senderName: giftForm.senderName,
+            amount: Number(giftForm.amount.replace(/\D/g, '')) || undefined,
+            message: giftForm.message,
+          },
+          guest?.id
+        );
+      }
+      setGiftSuccess(true);
+    } catch (err) {
+      console.error(err);
+      alert('Không gửi được xác nhận mừng cưới. Vui lòng thử lại!');
+    } finally {
+      setGiftLoading(false);
     }
   };
 
@@ -199,6 +276,12 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
     >
       {/* Unpaid / Draft Watermark overlay */}
       {invitation.status !== 'published' && <WatermarkOverlay showBadge={true} />}
+
+      {sandboxLabel && (
+        <div className="fixed top-0 inset-x-0 z-50 text-center text-[11px] font-semibold py-1.5 text-white" style={{ backgroundColor: palette.primary }}>
+          {sandboxLabel}
+        </div>
+      )}
 
       {/* Background Audio Player */}
       {invitation.musicUrl && (
@@ -254,6 +337,11 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   {...artCardProps}
                   className="rounded-2xl shadow-2xl transition-transform duration-300 group-hover:-translate-y-1.5"
                 />
+                {guest && (
+                  <span className="mt-5 block text-sm" style={{ color: palette.text }}>
+                    Trân trọng kính mời <strong style={{ color: palette.primary }}>{guest.name}</strong>
+                  </span>
+                )}
                 <span className="mt-5 text-xs font-semibold uppercase tracking-wider block" style={{ color: palette.primary }}>
                   Chạm để mở thiệp cưới
                 </span>
@@ -292,8 +380,8 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   <span className="text-xs uppercase tracking-widest text-[#827580] font-medium block">
                     Trân trọng kính mời
                   </span>
-                  <span className="font-script text-2xl text-[#C76A82]">
-                    Quý Khách & Gia Đình
+                  <span className="font-script text-2xl text-[#C76A82] line-clamp-2">
+                    {guest ? guest.name : 'Quý Khách & Gia Đình'}
                   </span>
                 </div>
               </div>
@@ -685,25 +773,12 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 Album Ảnh Cưới
               </h2>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {invitation.galleryImages.map((imgUrl, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setLightboxImg(imgUrl)}
-                    className="group relative aspect-square rounded-xl overflow-hidden shadow-sm border border-[#E8B7C8]/20 cursor-pointer hover:shadow-md transition-all"
-                  >
-                    <img
-                      src={imgUrl}
-                      alt={`Kỷ niệm cưới ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                      <Camera className="w-6 h-6" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <GallerySlideshow
+                images={invitation.galleryImages}
+                effect={invitation.design.galleryEffect || defaultEffectForTemplate(invitation.templateId)}
+                accent={palette.primary}
+                onOpenImage={(url) => setLightboxImg(url)}
+              />
             </div>
           )}
 
@@ -735,7 +810,9 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                     Gửi Xác Nhận Thành Công!
                   </h3>
                   <p className="text-xs text-[#827580] leading-relaxed">
-                    Cảm ơn bạn đã phản hồi. Sự hiện diện của bạn là niềm hạnh phúc to lớn đối với cô dâu chú rể.
+                    {guest && guest.rsvpStatus !== 'pending' && !rsvpData.message
+                      ? `${guest.name} đã ${guest.rsvpStatus === 'attending' ? 'xác nhận tham dự' : 'báo vắng mặt'}. Cảm ơn bạn đã phản hồi!`
+                      : 'Cảm ơn bạn đã phản hồi. Sự hiện diện của bạn là niềm hạnh phúc to lớn đối với cô dâu chú rể.'}
                   </p>
                 </div>
               ) : (
@@ -905,6 +982,10 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   onChange={(e) => setWishData({ ...wishData, message: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/40 resize-none"
                 />
+                <div>
+                  <p className="text-[11px] font-semibold text-[#453C45] mb-1.5">Ký tên lưu niệm (tùy chọn)</p>
+                  {showSignature && <SignaturePad onChange={setWishSignature} height={130} />}
+                </div>
                 <button
                   type="submit"
                   disabled={wishLoading}
@@ -944,6 +1025,9 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                       <p className="text-xs text-[#453C45] leading-relaxed">
                         "{w.message}"
                       </p>
+                      {w.signature && (
+                        <img src={w.signature} alt={`Chữ ký của ${w.senderName}`} className="mt-2 max-h-14 w-auto ml-auto" />
+                      )}
                     </div>
                   ))
                 )}
@@ -998,6 +1082,55 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Khách xác nhận đã mừng cưới → chủ thiệp nhận thông báo */}
+              <div className="max-w-xs mx-auto mt-5">
+                {giftSuccess ? (
+                  <div className="bg-white p-4 rounded-2xl border border-[#607B64]/30 text-xs text-[#453C45] flex items-center gap-2 justify-center">
+                    <CheckCircle className="w-4 h-4 text-[#607B64]" />
+                    Cô dâu chú rể đã nhận được xác nhận mừng cưới của bạn. Xin cảm ơn!
+                  </div>
+                ) : (
+                  <form onSubmit={handleGiftSubmit} className="bg-white p-4 rounded-2xl border border-[#E8B7C8]/30 shadow-sm space-y-2 text-left">
+                    <p className="text-xs font-semibold text-[#453C45] text-center">Đã gửi quà mừng? Báo cho cô dâu chú rể nhé</p>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Tên của bạn *"
+                      value={giftForm.senderName}
+                      onChange={(e) => setGiftForm({ ...giftForm, senderName: e.target.value })}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300"
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Số tiền (không bắt buộc)"
+                      value={giftForm.amount}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '');
+                        setGiftForm({ ...giftForm, amount: digits ? new Intl.NumberFormat('vi-VN').format(Number(digits)) : '' });
+                      }}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Lời nhắn kèm quà (không bắt buộc)"
+                      value={giftForm.message}
+                      onChange={(e) => setGiftForm({ ...giftForm, message: e.target.value })}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300"
+                    />
+                    <button
+                      type="submit"
+                      disabled={giftLoading}
+                      className="w-full py-2 rounded-lg text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                      style={{ backgroundColor: palette.primary }}
+                    >
+                      <Gift className="w-3.5 h-3.5" />
+                      {giftLoading ? 'Đang gửi...' : 'Tôi Đã Gửi Quà Mừng'}
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
           )}
 
@@ -1009,6 +1142,11 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
             <p className="text-sm italic text-[#453C45] max-w-md mx-auto leading-relaxed">
               "{invitation.thankYouMessage}"
             </p>
+            {findTrackByUrl(invitation.musicUrl) && (
+              <p className="mt-6 text-[10px] text-[#827580]">
+                Nhạc nền: {findTrackByUrl(invitation.musicUrl)!.title} — {findTrackByUrl(invitation.musicUrl)!.credit}
+              </p>
+            )}
             <div className="mt-8 pt-6 border-t border-[#E8B7C8]/20 flex items-center justify-center gap-2 text-xs text-[#827580]">
               <span>Tạo bởi nền tảng thiệp cưới</span>
               <a href="/" className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity">

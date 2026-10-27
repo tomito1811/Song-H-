@@ -35,6 +35,10 @@ export interface DesignConfig {
   heroLayout: 'centered' | 'split-left' | 'split-right' | 'card-overlay' | 'editorial';
   backgroundPattern?: 'none' | 'dots' | 'floral-corners' | 'arch-glow' | 'paper-texture';
   musicPreset?: string;
+  /** Tên bài nhạc nền đã chọn từ thư viện (hiển thị). */
+  musicTitle?: string;
+  /** Hiệu ứng trình chiếu album ảnh. Không đặt → tự chọn theo mẫu thiệp. */
+  galleryEffect?: GalleryEffect;
   /**
    * Thiết kế minh họa gốc (bộ sưu tập cao cấp). Khi có giá trị, thiệp hiển thị
    * bằng InvitationArtCard (SVG + chữ HTML) thay cho ảnh bìa mặc định.
@@ -42,6 +46,18 @@ export interface DesignConfig {
    */
   motif?: TemplateMotif;
 }
+
+export type GalleryEffect =
+  | 'fade'
+  | 'kenburns'
+  | 'slide'
+  | 'zoom'
+  | 'flip'
+  | 'cube'
+  | 'blur'
+  | 'polaroid'
+  | 'curtain'
+  | 'mosaic';
 
 export type MotifId =
   | 'song-hy'
@@ -198,6 +214,10 @@ export interface WeddingInvitation {
   timelineEvents: TimelineEvent[];
   giftBank: GiftBankInfo;
   viewsCount: number;
+  /** Thiệp dùng lượt miễn phí (mỗi tài khoản 1 thiệp, đầy đủ tính năng). */
+  isFreeTrial?: boolean;
+  /** Khóa bí mật của bản xem trước (collection previews/{previewKey}). */
+  previewKey?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -213,6 +233,42 @@ export interface Guest {
   rsvpStatus: 'pending' | 'attending' | 'declined';
   attendeesCount: number;
   note?: string;
+  /** Lần cuối khách mở link riêng. */
+  lastViewedAt?: string;
+  viewCount?: number;
+  respondedAt?: string;
+  giftSent?: boolean;
+  createdAt: string;
+}
+
+/** Khách xác nhận đã gửi quà mừng cưới. */
+export interface GiftRecord {
+  id: string;
+  invitationId: string;
+  guestId?: string;
+  senderName: string;
+  amount?: number;
+  method: 'bank' | 'cash' | 'other';
+  message?: string;
+  createdAt: string;
+}
+
+export type NotificationType = 'wish' | 'rsvp' | 'gift' | 'view';
+
+/** Thông báo realtime gửi về tài khoản quản lý thiệp. */
+export interface OwnerNotification {
+  id: string;
+  ownerId: string;
+  invitationId: string;
+  invitationTitle?: string;
+  type: NotificationType;
+  guestId?: string;
+  guestName: string;
+  message?: string;
+  isAttending?: boolean;
+  attendeesCount?: number;
+  amount?: number;
+  read: boolean;
   createdAt: string;
 }
 
@@ -235,6 +291,9 @@ export interface Wish {
   senderName: string;
   senderRelation: string;
   message: string;
+  /** Chữ ký vẽ tay của khách (PNG data URL, nền trong suốt). */
+  signature?: string;
+  guestId?: string;
   createdAt: string;
   isApproved: boolean;
 }
@@ -253,6 +312,8 @@ export interface User {
   createdAt: string;
   lastLoginAt?: string;
   acceptedTermsAt?: string;
+  /** ID thiệp đã dùng lượt xuất bản miễn phí (mỗi tài khoản 1 lần). */
+  freeInvitationId?: string;
 }
 
 export interface PricingPlan {

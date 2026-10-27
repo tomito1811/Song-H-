@@ -20,6 +20,8 @@ import { WEDDING_TEMPLATES } from './data/templates';
 import { fetchInvitationBySlug, fetchInvitationById, createInvitation, getCurrentUser } from './utils/api';
 import { auth, onAuthStateChanged } from './firebase';
 import { ThemeProvider } from './context/ThemeContext';
+import { draftFromTemplate } from './utils/draftFromTemplate';
+import { fetchPreview } from './utils/engagement';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<string>('home');
@@ -27,6 +29,9 @@ export default function App() {
 
   const [activeInvitation, setActiveInvitation] = useState<WeddingInvitation | null>(null);
   const [publicInvitation, setPublicInvitation] = useState<WeddingInvitation | null>(null);
+  const [publicGuestId, setPublicGuestId] = useState<string | undefined>(undefined);
+  const [sandboxLabel, setSandboxLabel] = useState<string | undefined>(undefined);
+  const [publicNotFound, setPublicNotFound] = useState(false);
 
   const [isAIDesignerOpen, setIsAIDesignerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -55,19 +60,47 @@ export default function App() {
   useEffect(() => {
     const path = window.location.pathname;
     if (path.startsWith('/invite/')) {
-      const slug = path.replace('/invite/', '').split('/')[0];
+      const slug = decodeURIComponent(path.replace('/invite/', '').split('/')[0]);
+      const g = new URLSearchParams(window.location.search).get('g') || undefined;
       if (slug) {
+        setCurrentView('invite');
         fetchInvitationBySlug(slug)
           .then((inv) => {
             if (inv) {
+              setPublicGuestId(g);
               setPublicInvitation(inv);
-              setCurrentView('invite');
-            }
+            } else setPublicNotFound(true);
           })
           .catch((err) => {
             console.warn('Could not load public invitation:', err);
+            setPublicNotFound(true);
           });
       }
+    } else if (path.startsWith('/demo/')) {
+      // Trang demo mẫu thiệp (mở từ QR "xem mẫu") — dữ liệu mẫu, không ghi gì
+      const tplSlug = decodeURIComponent(path.replace('/demo/', '').split('/')[0]);
+      const tpl = WEDDING_TEMPLATES.find((t) => t.slug === tplSlug || t.id === tplSlug);
+      setCurrentView('invite');
+      if (tpl) {
+        setPublicInvitation(draftFromTemplate(tpl, '', true));
+        setSandboxLabel(`Bản demo mẫu "${tpl.name}" — dữ liệu minh họa`);
+      } else setPublicNotFound(true);
+    } else if (path.startsWith('/preview/')) {
+      // Bản xem trước thiệp đang soạn (mở từ QR trong trình thiết kế)
+      const key = decodeURIComponent(path.replace('/preview/', '').split('/')[0]);
+      setCurrentView('invite');
+      fetchPreview(key).then((inv) => {
+        if (inv) {
+          setPublicInvitation({ ...inv, status: 'published' });
+          setSandboxLabel(
+            inv.status === 'published'
+              ? 'Bản xem trước — bản mới nhất bạn đang chỉnh sửa'
+              : 'Bản xem trước — thiệp chưa xuất bản, chỉ người có mã QR mới xem được'
+          );
+        } else setPublicNotFound(true);
+      });
+    } else if (path === '/builder/new' || path.startsWith('/builder/')) {
+      setCurrentView('templates');
     } else if (path === '/templates') {
       setCurrentView('templates');
     } else if (path === '/dashboard') {
@@ -114,75 +147,7 @@ export default function App() {
 
   // Start new invitation from template (Allows guests to design freely before signing in)
   const handleSelectTemplate = (template: WeddingTemplate) => {
-    const draftInv: WeddingInvitation = {
-      id: `draft-${Date.now()}`,
-      slug: '',
-      userId: currentUser?.id || auth.currentUser?.uid || '',
-      title: 'Thiệp Cưới Mới',
-      status: 'draft',
-      templateId: template.id,
-      brideName: '',
-      groomName: '',
-      brideTitle: 'Cô Dâu',
-      groomTitle: 'Chú Rể',
-      brideParents: { father: '', mother: '' },
-      groomParents: { father: '', mother: '' },
-      weddingDate: '',
-      weddingTime: '11:00',
-      lunarDate: '',
-      venueName: '',
-      venueAddress: '',
-      mapUrl: '',
-      invitationMessage: template.defaultInvitationMessage,
-      thankYouMessage: template.defaultThankYouMessage,
-      // Mẫu minh họa (design.motif) tự vẽ thiệp từ dữ liệu thật, không cần ảnh bìa mẫu.
-      coverImage: template.design.motif ? '' : template.preview,
-      galleryImages: template.design.motif ? [] : [template.preview],
-      musicUrl: 'https://assets.mixkit.co/music/preview/mixkit-wedding-waltz-298.mp3',
-      design: template.design,
-      sectionsVisibility: {
-        cover: true,
-        countdown: true,
-        parents: true,
-        eventInfo: true,
-        loveStory: true,
-        timeline: true,
-        gallery: true,
-        rsvp: true,
-        wishes: true,
-        giftBox: true,
-        map: true,
-      },
-      loveStories: [
-        {
-          id: 'story-1',
-          yearOrDate: '',
-          title: 'Lần Đầu Gặp Gỡ',
-          description: 'Những ánh mắt đầu tiên trao nhau và bắt đầu một hành trình yêu thương.',
-        },
-        {
-          id: 'story-2',
-          yearOrDate: '',
-          title: 'Lời Hứa Nguyện Ước',
-          description: 'Khoảnh khắc trao chiếc nhẫn ước định ngày về chung một mái nhà.',
-        },
-      ],
-      timelineEvents: [
-        { id: 'time-1', time: '10:30', title: 'Đón Khách', description: 'Đón tiếp quý khách và chụp hình lưu niệm.' },
-        { id: 'time-2', time: '11:30', title: 'Làm Lễ', description: 'Nghi thức trao nhẫn và cắt bánh cưới.' },
-        { id: 'time-3', time: '12:00', title: 'Khai Tiệc', description: 'Bữa tiệc mừng hạnh phúc cùng gia đình hai bên.' },
-      ],
-      giftBank: {
-        enabled: false,
-        bankName: 'TPBank',
-        accountNumber: '87583868888',
-        accountHolder: 'TRAN MINH TIEN',
-        note: 'Mừng cưới',
-      },
-      viewsCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const draftInv = draftFromTemplate(template, currentUser?.id || auth.currentUser?.uid || '');
 
     setActiveInvitation(draftInv);
     setCurrentView('builder');
@@ -288,6 +253,8 @@ export default function App() {
   const handleOpenPublicInvite = async (slug: string) => {
     const inv = await fetchInvitationBySlug(slug);
     if (inv) {
+      setPublicGuestId(undefined);
+      setSandboxLabel(undefined);
       setPublicInvitation(inv);
       setCurrentView('invite');
       window.history.pushState({}, '', `/invite/${slug}`);
@@ -344,10 +311,28 @@ export default function App() {
 
           {currentView === 'invite' && publicInvitation && (
             <PublicInvitationView
+              key={publicInvitation.id + (publicGuestId || '')}
               invitation={publicInvitation}
               onBackToHome={() => navigateTo('home')}
               isPreviewMode={false}
+              guestId={publicGuestId}
+              sandboxLabel={sandboxLabel}
             />
+          )}
+
+          {currentView === 'invite' && !publicInvitation && (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-sm text-[#827580] p-6 text-center">
+              {publicNotFound ? (
+                <>
+                  <p>Không tìm thấy thiệp hoặc thiệp chưa được xuất bản.</p>
+                  <button onClick={() => navigateTo('home')} className="underline text-[#C76A82] cursor-pointer">
+                    Về trang chủ
+                  </button>
+                </>
+              ) : (
+                <p>Đang mở thiệp cưới…</p>
+              )}
+            </div>
           )}
 
           {currentView === 'dashboard' && currentUser && (

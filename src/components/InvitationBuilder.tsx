@@ -45,10 +45,14 @@ import {
   adminPublishInvitation,
   publishInvitation,
   isAdminUser,
+  getFreeTrialStatus,
 } from '../utils/api';
+import { upsertPreview, buildPreviewLink } from '../utils/engagement';
+import { MusicPicker } from './MusicPicker';
+import { GalleryEffectPicker } from './GalleryEffectPicker';
 import { auth } from '../firebase';
 import { generateQrDataUrl } from '../utils/formatters';
-import { uploadImageToStorage } from '../utils/imageUpload';
+import { uploadImageToStorage, uploadImagesBatch } from '../utils/imageUpload';
 
 interface InvitationBuilderProps {
   initialInvitation: WeddingInvitation;
@@ -86,11 +90,17 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
   const [isUploadingCover, setIsUploadingCover] = useState<boolean>(false);
   const [isUploadingGallery, setIsUploadingGallery] = useState<boolean>(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [galleryProgress, setGalleryProgress] = useState<{ done: number; total: number } | null>(null);
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
 
   // Modals & Workflow state
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [previewQrUrl, setPreviewQrUrl] = useState('');
+  const [previewLink, setPreviewLink] = useState('');
+  const [previewQrLoading, setPreviewQrLoading] = useState(false);
+  const [freeTrialAvailable, setFreeTrialAvailable] = useState(true);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
   // Publish & Payment workflow state
@@ -307,7 +317,9 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
       return;
     }
 
-    // 6. Regular User without active plan: Open Plan Selection Modal
+    // 6. Regular User without active plan: kiểm tra lượt miễn phí rồi mở modal chọn gói
+    const freeStatus = await getFreeTrialStatus(saved.id);
+    setFreeTrialAvailable(freeStatus.available);
     setPlanModalOpen(true);
   };
 
@@ -483,37 +495,94 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
     }
   };
 
-  // Image Upload: Gallery Album Photos
-  const handleGalleryPhotosUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Ảnh album: chọn nhiều ảnh / kéo thả → nén nhanh WebP → tải song song → tự thêm vào trình chiếu
+  const uploadGalleryFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    if (!auth.currentUser) {
+      setSaveToast('Vui lòng đăng nhập Google để tải ảnh lên album');
+      if (onRequireAuth) onRequireAuth();
+      return;
+    }
 
     setIsUploadingGallery(true);
-    setUploadMessage(`Đang xử lý và tải lên ${files.length} ảnh album...`);
-
-    const uploadedUrls: string[] = [];
+    setGalleryProgress({ done: 0, total: files.length });
+    setUploadMessage(`Đang nén & tải ${files.length} ảnh...`);
     const folder = `invitations/${invitation.id || 'draft'}/gallery`;
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        setUploadMessage(`Đang tải ảnh (${i + 1}/${files.length}) lên Firebase Storage...`);
-        const url = await uploadImageToStorage(files[i], folder);
-        uploadedUrls.push(url);
-      }
+      const { urls, errors } = await uploadImagesBatch(files, folder, (p) => {
+        setGalleryProgress({ done: p.done, total: p.total });
+        setUploadMessage(
+          `Đã xử lý ${p.done}/${p.total} ảnh` +
+            (p.savedBytes > 0 ? ` • tiết kiệm ${(p.savedBytes / 1024 / 1024).toFixed(1)}MB` : '')
+        );
+      });
 
-      updateState((prev) => ({
-        ...prev,
-        galleryImages: [...(prev.galleryImages || []), ...uploadedUrls],
-      }));
-      setSaveToast(`Đã thêm ${uploadedUrls.length} ảnh vào album!`);
-      setTimeout(() => setSaveToast(null), 3000);
+      if (urls.length > 0) {
+        updateState((prev) => ({
+          ...prev,
+          // Ảnh mẫu Unsplash mặc định được thay bằng ảnh thật của cặp đôi
+          galleryImages: [
+            ...(prev.galleryImages || []).filter((u) => !u.includes('images.unsplash.com')),
+            ...urls,
+          ],
+        }));
+      }
+      setSaveToast(
+        `Đã thêm ${urls.length} ảnh vào album trình chiếu` + (errors.length ? ` (${errors.length} ảnh lỗi)` : '')
+      );
+      if (errors.length) console.warn('Lỗi tải ảnh:', errors);
+      setTimeout(() => setSaveToast(null), 3500);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Lỗi khi tải ảnh album lên Firebase Storage.');
     } finally {
       setIsUploadingGallery(false);
+      setGalleryProgress(null);
       setUploadMessage(null);
-      e.target.value = '';
+    }
+  };
+
+  const handleGalleryPhotosUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) await uploadGalleryFiles(files);
+    e.target.value = '';
+  };
+
+  const moveGalleryImage = (from: number, to: number) => {
+    updateState((prev) => {
+      const arr = [...(prev.galleryImages || [])];
+      if (to < 0 || to >= arr.length) return prev;
+      const [item] = arr.splice(from, 1);
+      arr.splice(to, 0, item);
+      return { ...prev, galleryImages: arr };
+    });
+  };
+
+  /** Mở QR: luôn có QR xem trước bản đang soạn; khi đã xuất bản có thêm QR link chính thức. */
+  const handleOpenQr = async () => {
+    setQrModalOpen(true);
+    if (!auth.currentUser && !currentUser) {
+      setPreviewQrUrl('');
+      return;
+    }
+    try {
+      setPreviewQrLoading(true);
+      const saved = (await performSave()) || invitationRef.current;
+      if (!saved || saved.id.startsWith('draft-')) return;
+      const key = await upsertPreview(saved);
+      if (!saved.previewKey) {
+        setInvitation((prev) => ({ ...prev, previewKey: key }));
+        invitationRef.current = { ...invitationRef.current, previewKey: key };
+      }
+      const link = buildPreviewLink(key);
+      setPreviewLink(link);
+      setPreviewQrUrl(await generateQrDataUrl(link, invitation.design.palette.primary));
+    } catch (err) {
+      console.warn('Không tạo được QR xem trước:', err);
+    } finally {
+      setPreviewQrLoading(false);
     }
   };
 
@@ -698,9 +767,9 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
           </button>
 
           <button
-            onClick={() => setQrModalOpen(true)}
+            onClick={handleOpenQr}
             className="p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#453C45] cursor-pointer"
-            title="Mã QR & Chia sẻ"
+            title="Mã QR xem trước trên điện thoại & chia sẻ"
           >
             <QrCode className="w-4 h-4" />
           </button>
@@ -1331,22 +1400,29 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                   </select>
                 </div>
 
-                {/* Music URL */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#453C45] mb-1">
-                    Nhạc Nền Hôn Lễ (MP3 URL)
-                  </label>
-                  <input
-                    type="url"
-                    value={invitation.musicUrl || ''}
-                    onChange={(e) => updateState((prev) => ({ ...prev, musicUrl: e.target.value }))}
-                    placeholder="https://.../music.mp3"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300"
-                  />
-                  <p className="text-[11px] text-[#827580] mt-1">
-                    Để tôn trọng quyền riêng tư người dùng, nhạc sẽ phát nhẹ sau khi khách nhấn nút mở thiệp.
-                  </p>
-                </div>
+                {/* Nhạc nền: thư viện nhạc cưới + tải lên / dán link */}
+                <MusicPicker
+                  value={invitation.musicUrl || ''}
+                  title={invitation.design.musicTitle}
+                  accent={invitation.design.palette.primary}
+                  onChange={(url, title) =>
+                    updateState((prev) => ({
+                      ...prev,
+                      musicUrl: url,
+                      design: { ...prev.design, musicTitle: title || '' },
+                    }))
+                  }
+                />
+
+                {/* Hiệu ứng trình chiếu album ảnh */}
+                <GalleryEffectPicker
+                  value={invitation.design.galleryEffect}
+                  templateId={invitation.templateId}
+                  sampleImages={invitation.galleryImages}
+                  onChange={(effect) =>
+                    updateState((prev) => ({ ...prev, design: { ...prev.design, galleryEffect: effect } }))
+                  }
+                />
               </div>
             )}
 
@@ -1403,7 +1479,7 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                         Ảnh Album Cưới ({invitation.galleryImages?.length || 0} ảnh)
                       </h4>
                       <p className="text-[11px] text-neutral-500">
-                        Nén tự động tối đa 1600px và lưu trữ trên Firebase Storage
+                        Chọn nhiều ảnh cùng lúc • nén nhanh • tự trình chiếu theo hiệu ứng đã chọn
                       </p>
                     </div>
 
@@ -1451,6 +1527,37 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                     </div>
                   </div>
 
+                  {/* Kéo thả ảnh + tiến trình nén/tải */}
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingPhotos(true);
+                    }}
+                    onDragLeave={() => setIsDraggingPhotos(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingPhotos(false);
+                      if (!isUploadingGallery && e.dataTransfer.files?.length) uploadGalleryFiles(e.dataTransfer.files);
+                    }}
+                    className={`rounded-xl border-2 border-dashed p-3 text-center text-[11px] transition-colors ${
+                      isDraggingPhotos ? 'border-[#C76A82] bg-[#F6DCE5]/40 text-[#C76A82]' : 'border-neutral-200 text-[#827580]'
+                    }`}
+                  >
+                    {galleryProgress ? (
+                      <div className="space-y-1.5">
+                        <div className="h-1.5 rounded-full bg-neutral-200 overflow-hidden">
+                          <div
+                            className="h-full bg-[#C76A82] transition-all"
+                            style={{ width: `${Math.round((galleryProgress.done / galleryProgress.total) * 100)}%` }}
+                          />
+                        </div>
+                        <p>{uploadMessage}</p>
+                      </div>
+                    ) : (
+                      <p>Kéo thả nhiều ảnh vào đây — ảnh được nén nhanh (WebP ≤1600px) và tự ghép vào album trình chiếu.</p>
+                    )}
+                  </div>
+
                   {/* Visual Gallery Grid */}
                   <div className="grid grid-cols-2 gap-2.5">
                     {invitation.galleryImages?.map((url, idx) => (
@@ -1464,9 +1571,36 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                          <span className="text-[10px] text-white font-mono bg-black/50 px-1.5 py-0.5 rounded self-start">
-                            #{idx + 1}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-white font-mono bg-black/50 px-1.5 py-0.5 rounded">
+                              #{idx + 1}
+                            </span>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => moveGalleryImage(idx, idx - 1)}
+                                disabled={idx === 0}
+                                className="px-1.5 py-0.5 text-[10px] bg-white/90 rounded disabled:opacity-40"
+                                title="Đưa lên trước"
+                              >
+                                ◀
+                              </button>
+                              <button
+                                onClick={() => moveGalleryImage(idx, idx + 1)}
+                                disabled={idx === (invitation.galleryImages?.length || 0) - 1}
+                                className="px-1.5 py-0.5 text-[10px] bg-white/90 rounded disabled:opacity-40"
+                                title="Đưa ra sau"
+                              >
+                                ▶
+                              </button>
+                              <button
+                                onClick={() => updateState((prev) => ({ ...prev, coverImage: url }))}
+                                className="px-1.5 py-0.5 text-[10px] bg-white/90 rounded"
+                                title="Đặt làm ảnh bìa"
+                              >
+                                Bìa
+                              </button>
+                            </div>
+                          </div>
                           <button
                             onClick={() => {
                               const newArr = invitation.galleryImages.filter((_, i) => i !== idx);
@@ -1639,23 +1773,51 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
       {qrModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#2A232A] rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl space-y-4 border border-[#E8B7C8]/40 dark:border-[#3D333D]">
-            <h3 className="font-heading font-bold text-base text-[#453C45] dark:text-[#F5EDE8]">Mã QR Chia Sẻ Thiệp Cưới</h3>
-            <p className="text-xs text-[#827580] dark:text-[#B9A9B4]">
-              Quét mã QR để mở website thiệp cưới cá nhân trên điện thoại.
-            </p>
-            {qrDataUrl && (
-              <div className="w-56 h-56 mx-auto p-2 bg-[#FFFBF7] dark:bg-[#1F1A1F] rounded-xl border border-[#E8B7C8]/40 shadow-inner flex items-center justify-center">
-                <img src={qrDataUrl} alt="QR Code" className="w-full h-full object-contain" />
+            <h3 className="font-heading font-bold text-base text-[#453C45] dark:text-[#F5EDE8]">Quét QR Xem Thiệp Trên Điện Thoại</h3>
+
+            {/* QR xem trước bản đang soạn — dùng được bất cứ lúc nào, trước và sau khi xuất bản */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-[#C76A82]">Bản xem trước (cập nhật theo chỉnh sửa mới nhất)</p>
+              {!auth.currentUser && !currentUser ? (
+                <p className="text-xs text-[#827580]">Đăng nhập Google để tạo mã QR xem trước thiệp đang soạn.</p>
+              ) : previewQrLoading ? (
+                <div className="w-48 h-48 mx-auto flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#C76A82]" />
+                </div>
+              ) : previewQrUrl ? (
+                <>
+                  <div className="w-48 h-48 mx-auto p-2 bg-[#FFFBF7] dark:bg-[#1F1A1F] rounded-xl border border-[#E8B7C8]/40 shadow-inner">
+                    <img src={previewQrUrl} alt="QR xem trước" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex items-center justify-center gap-3 text-[11px]">
+                    <a href={previewLink} target="_blank" rel="noreferrer" className="text-[#C76A82] underline">Mở bản xem trước</a>
+                    <button onClick={() => navigator.clipboard.writeText(previewLink)} className="text-[#827580] underline cursor-pointer">Sao chép link</button>
+                    <a href={previewQrUrl} download={`QR-XemTruoc-${invitation.slug || 'thiep'}.png`} className="text-[#827580] underline">Tải QR</a>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-[#827580]">Lưu thiệp để tạo mã QR xem trước.</p>
+              )}
+            </div>
+
+            {invitation.status === 'published' && qrDataUrl && (
+              <div className="space-y-2 pt-3 border-t border-[#E8B7C8]/30">
+                <p className="text-xs font-semibold text-[#607B64]">Link chính thức gửi khách mời</p>
+                <div className="w-40 h-40 mx-auto p-2 bg-[#FFFBF7] dark:bg-[#1F1A1F] rounded-xl border border-[#E8B7C8]/40 shadow-inner">
+                  <img src={qrDataUrl} alt="QR Code" className="w-full h-full object-contain" />
+                </div>
               </div>
             )}
             <div className="pt-2 flex items-center gap-2">
-              <a
-                href={qrDataUrl}
-                download={`QR-Thiep-${invitation.slug || 'cuoi'}.png`}
-                className="flex-1 py-2.5 rounded-xl bg-[#C76A82] text-white text-xs font-semibold hover:bg-[#B0596E] transition-colors"
-              >
-                Tải ảnh QR
-              </a>
+              {invitation.status === 'published' && (
+                <a
+                  href={qrDataUrl}
+                  download={`QR-Thiep-${invitation.slug || 'cuoi'}.png`}
+                  className="flex-1 py-2.5 rounded-xl bg-[#C76A82] text-white text-xs font-semibold hover:bg-[#B0596E] transition-colors"
+                >
+                  Tải QR chính thức
+                </a>
+              )}
               <button
                 onClick={() => setQrModalOpen(false)}
                 className="flex-1 py-2.5 rounded-xl border border-neutral-300 dark:border-[#3D333D] text-xs font-semibold text-[#453C45] dark:text-[#F5EDE8]"
@@ -1717,6 +1879,7 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
         invitation={invitation}
         onSelectPlan={handleSelectPlan}
         isLoading={isPublishing}
+        freeTrialAvailable={freeTrialAvailable}
       />
 
       {/* 2. Modal Thanh Toán SePay VietQR (PaymentModal) */}

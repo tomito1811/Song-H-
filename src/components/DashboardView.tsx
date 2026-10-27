@@ -21,8 +21,22 @@ import {
   Sparkles,
   Copy,
   RefreshCw,
+  Bell,
+  Gift,
+  BookHeart,
+  Link2,
+  ListPlus,
 } from 'lucide-react';
-import { WeddingInvitation, Guest, Order, User } from '../types/wedding';
+import { WeddingInvitation, Guest, Order, User, Wish, RSVP, GiftRecord, OwnerNotification } from '../types/wedding';
+import {
+  buildGuestLink,
+  fetchGifts,
+  subscribeNotifications,
+  markNotificationsRead,
+  describeNotification,
+} from '../utils/engagement';
+import { fetchRsvps, fetchWishes } from '../utils/api';
+import { WishAlbum } from './WishAlbum';
 import { InvitationArtCard } from './templateArt/InvitationArtCard';
 import {
   fetchInvitations,
@@ -53,7 +67,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenPublicInvite,
   onUserUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<'invitations' | 'guests' | 'orders'>('invitations');
+  const [activeTab, setActiveTab] = useState<'invitations' | 'guests' | 'wishes' | 'notifications' | 'orders'>(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('tab');
+      if (t === 'notifications' || t === 'wishes' || t === 'guests') return t;
+    } catch {
+      /* ignore */
+    }
+    return 'invitations';
+  });
+  const [wishes, setWishes] = useState<Wish[]>([]);
+  const [rsvps, setRsvps] = useState<RSVP[]>([]);
+  const [gifts, setGifts] = useState<GiftRecord[]>([]);
+  const [notifications, setNotifications] = useState<OwnerNotification[]>([]);
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkGroup, setBulkGroup] = useState<Guest['group']>('family');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [qrTitle, setQrTitle] = useState('Mã QR Thiệp Cưới');
+  const [qrLink, setQrLink] = useState('');
   const [invitations, setInvitations] = useState<WeddingInvitation[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -84,6 +117,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [qrModalUrl, setQrModalUrl] = useState<string | null>(null);
   const [qrSlug, setQrSlug] = useState<string>('');
 
+  // Lời chúc, RSVP, quà mừng của thiệp đang chọn
+  const loadEngagement = async (invId: string) => {
+    if (!invId) return;
+    const [w, r, g] = await Promise.all([
+      fetchWishes(invId).catch(() => [] as Wish[]),
+      fetchRsvps(invId).catch(() => [] as RSVP[]),
+      fetchGifts(invId).catch(() => [] as GiftRecord[]),
+    ]);
+    setWishes(w);
+    setRsvps(r);
+    setGifts(g);
+  };
+
+  // Thông báo realtime: cập nhật ngay khi khách gửi lời chúc / RSVP / mừng cưới
+  useEffect(() => {
+    return subscribeNotifications(currentUser.id, setNotifications);
+  }, [currentUser.id]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -93,6 +146,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         setSelectedInvForGuests(invs[0].id);
         const gstList = await fetchGuests(invs[0].id);
         setGuests(gstList);
+        loadEngagement(invs[0].id);
       }
       const ords = await fetchOrders();
       setOrders(ords.filter(o => currentUser.role === 'admin' || o.userId === currentUser.id));
@@ -133,6 +187,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setSelectedInvForGuests(id);
     const gstList = await fetchGuests(id);
     setGuests(gstList);
+    loadEngagement(id);
+  };
+
+  // Realtime: khi có thông báo mới của thiệp đang xem → làm mới danh sách khách & lời chúc
+  const latestNotifId = notifications[0]?.id;
+  useEffect(() => {
+    if (!latestNotifId || !selectedInvForGuests) return;
+    if (notifications[0].invitationId !== selectedInvForGuests) return;
+    fetchGuests(selectedInvForGuests).then(setGuests).catch(() => {});
+    loadEngagement(selectedInvForGuests);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestNotifId]);
+
+  const selectedInv = invitations.find((i) => i.id === selectedInvForGuests);
+
+  const copyGuestLink = (guest: Guest) => {
+    if (!selectedInv) return;
+    copyToClipboard(buildGuestLink(selectedInv, guest), `guest-${guest.id}`);
+  };
+
+  const showGuestQr = async (guest: Guest) => {
+    if (!selectedInv) return;
+    const link = buildGuestLink(selectedInv, guest);
+    const qr = await generateQrDataUrl(link, selectedInv.design?.palette?.primary || '#C76A82');
+    setQrTitle(`Thiệp mời riêng: ${guest.name}`);
+    setQrLink(link);
+    setQrSlug(`${selectedInv.slug}-${guest.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-')}`);
+    setQrModalUrl(qr);
+  };
+
+  // Thêm nhiều khách: mỗi dòng 1 tên (có thể kèm ", SĐT")
+  const handleBulkAdd = async () => {
+    if (!selectedInvForGuests) return;
+    const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const added: Guest[] = [];
+      for (const line of lines.slice(0, 300)) {
+        const [name, phone] = line.split(/[,;\t]/).map((x) => x.trim());
+        added.push(await createGuest(selectedInvForGuests, { name, phone: phone || '', group: bulkGroup, attendeesCount: 1 }));
+      }
+      setGuests((prev) => [...prev, ...added]);
+      setBulkText('');
+      setBulkOpen(false);
+    } catch (err) {
+      alert('Không thể thêm danh sách khách');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const exportGuestLinks = () => {
+    if (!selectedInv || guests.length === 0) return;
+    const rows = guests.map((g) => `"${g.name}","${g.phone || ''}","${buildGuestLink(selectedInv, g)}"`);
+    const csv = '\uFEFF' + ['Họ Tên,Điện Thoại,Link Thiệp Riêng', ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Link-Thiep-Rieng-${selectedInv.slug}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   // Add guest
@@ -189,6 +305,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://thieponl.vn';
     const publicUrl = `${origin}/invite/${inv.slug}`;
     const qr = await generateQrDataUrl(publicUrl, inv.design.palette.primary);
+    setQrTitle('Mã QR Thiệp Cưới');
+    setQrLink(publicUrl);
     setQrModalUrl(qr);
     setQrSlug(inv.slug);
   };
@@ -339,6 +457,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             <Users className="w-4 h-4" />
             Quản Lý Khách Mời & RSVP
+          </button>
+          <button
+            onClick={() => setActiveTab('wishes')}
+            className={`pb-3 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'wishes' ? 'border-b-2 border-[#C76A82] text-[#C76A82]' : 'hover:text-[#453C45]'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Lời Chúc & Quà Mừng
+          </button>
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`pb-3 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'notifications' ? 'border-b-2 border-[#C76A82] text-[#C76A82]' : 'hover:text-[#453C45]'
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+            Thông Báo
+            {unreadCount > 0 && (
+              <span className="min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('orders')}
@@ -545,6 +686,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="flex items-center gap-2">
               <button
+                onClick={exportGuestLinks}
+                className="px-3 py-1.5 rounded-xl border border-neutral-300 text-xs font-semibold text-[#453C45] hover:bg-neutral-50 flex items-center gap-1.5 cursor-pointer"
+                title="Xuất danh sách link thiệp riêng để gửi Zalo/SMS"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                Xuất Link Riêng
+              </button>
+              <button
+                onClick={() => setBulkOpen(true)}
+                className="px-3 py-1.5 rounded-xl border border-neutral-300 text-xs font-semibold text-[#453C45] hover:bg-neutral-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                <ListPlus className="w-3.5 h-3.5" />
+                Thêm Nhiều Khách
+              </button>
+              <button
                 onClick={handleExportCSV}
                 className="px-3 py-1.5 rounded-xl border border-neutral-300 text-xs font-semibold text-[#453C45] hover:bg-neutral-50 flex items-center gap-1.5 cursor-pointer"
               >
@@ -595,7 +751,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <th className="py-3 px-4">Điện Thoại</th>
                     <th className="py-3 px-4">Trạng Thái RSVP</th>
                     <th className="py-3 px-4">Số Người</th>
-                    <th className="py-3 px-4">Ghi Chú</th>
+                    <th className="py-3 px-4">Đã Xem / Mừng</th>
+                    <th className="py-3 px-4">Link Riêng & QR</th>
                     <th className="py-3 px-4 text-right">Thao Tác</th>
                   </tr>
                 </thead>
@@ -625,7 +782,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           )}
                         </td>
                         <td className="py-3 px-4 font-mono font-medium">{guest.attendeesCount}</td>
-                        <td className="py-3 px-4 text-[#827580] max-w-xs truncate">{guest.note || '—'}</td>
+                        <td className="py-3 px-4 text-[#827580] whitespace-nowrap">
+                          {guest.lastViewedAt ? (
+                            <span title={new Date(guest.lastViewedAt).toLocaleString('vi-VN')} className="inline-flex items-center gap-1 text-[#607B64]">
+                              <Eye className="w-3 h-3" /> {guest.viewCount || 1} lần
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400">Chưa mở</span>
+                          )}
+                          {guest.giftSent && (
+                            <span className="ml-2 inline-flex items-center gap-0.5 text-[#B6925B]" title="Đã báo gửi quà mừng">
+                              <Gift className="w-3 h-3" />
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => copyGuestLink(guest)}
+                              disabled={selectedInv?.status !== 'published'}
+                              className="px-2 py-1 rounded-lg border border-neutral-200 hover:bg-neutral-50 flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                              title={selectedInv?.status === 'published' ? 'Sao chép link thiệp riêng' : 'Xuất bản thiệp để gửi link'}
+                            >
+                              {copiedKey === `guest-${guest.id}` ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                              {copiedKey === `guest-${guest.id}` ? 'Đã chép' : 'Link'}
+                            </button>
+                            <button
+                              onClick={() => showGuestQr(guest)}
+                              disabled={selectedInv?.status !== 'published'}
+                              className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 cursor-pointer disabled:opacity-40"
+                              title="Mã QR thiệp riêng"
+                            >
+                              <QrCode className="w-3.5 h-3.5 text-[#C76A82]" />
+                            </button>
+                          </div>
+                        </td>
                         <td className="py-3 px-4 text-right">
                           <button
                             onClick={() => handleDeleteGuest(guest.id)}
@@ -645,6 +836,203 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Chưa có khách mời nào trong danh sách. Bấm "Thêm Khách Mới" để bắt đầu ghi nhận.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB: LỜI CHÚC & QUÀ MỪNG                                    */}
+      {/* ========================================================= */}
+      {activeTab === 'wishes' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-neutral-200">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-[#827580] whitespace-nowrap">Chọn thiệp cưới:</span>
+              <select
+                value={selectedInvForGuests}
+                onChange={(e) => handleSelectInvForGuests(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-xl border border-neutral-300 font-medium"
+              >
+                {invitations.map((i) => (
+                  <option key={i.id} value={i.id}>{i.title}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setAlbumOpen(true)}
+              disabled={!selectedInv}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#D4899C] to-[#C76A82] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <BookHeart className="w-4 h-4" />
+              Tạo Album Lời Chúc Kỷ Niệm
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              ['Lời chúc', wishes.length],
+              ['Xác nhận tham dự', rsvps.filter((r) => r.isAttending).length],
+              ['Báo vắng', rsvps.filter((r) => !r.isAttending).length],
+              ['Quà mừng', gifts.length],
+            ].map(([l, n]) => (
+              <div key={l as string} className="p-4 bg-white rounded-2xl border border-[#E8B7C8]/30">
+                <span className="text-xs text-[#827580] block">{l}</span>
+                <span className="font-heading text-2xl font-bold text-[#453C45] tabular-nums">{n}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100 font-heading font-bold text-sm text-[#453C45]">Sổ lưu bút ({wishes.length})</div>
+              <div className="divide-y divide-neutral-100 max-h-[520px] overflow-y-auto">
+                {wishes.length === 0 ? (
+                  <p className="p-6 text-center text-xs text-[#827580]">Chưa có lời chúc nào.</p>
+                ) : (
+                  wishes.map((w) => (
+                    <div key={w.id} className="p-4 text-xs space-y-1">
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#453C45]">{w.senderName}</span>
+                        <span className="text-[#827580]">{formatDateVN(w.createdAt)}</span>
+                      </div>
+                      <p className="text-[#453C45] leading-relaxed">"{w.message}"</p>
+                      {w.signature && <img src={w.signature} alt="Chữ ký" className="max-h-12 w-auto" />}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100 font-heading font-bold text-sm text-[#453C45] flex justify-between">
+                <span>Quà mừng đã nhận ({gifts.length})</span>
+                <span className="text-[#B6925B]">{formatVND(gifts.reduce((s, g) => s + (g.amount || 0), 0))}</span>
+              </div>
+              <div className="divide-y divide-neutral-100 max-h-[520px] overflow-y-auto">
+                {gifts.length === 0 ? (
+                  <p className="p-6 text-center text-xs text-[#827580]">Chưa có khách báo gửi quà mừng.</p>
+                ) : (
+                  gifts.map((g) => (
+                    <div key={g.id} className="p-4 text-xs flex justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-[#453C45] flex items-center gap-1">
+                          <Gift className="w-3.5 h-3.5 text-[#B6925B]" /> {g.senderName}
+                        </p>
+                        {g.message && <p className="text-[#827580] mt-0.5">{g.message}</p>}
+                      </div>
+                      <div className="text-right whitespace-nowrap">
+                        <p className="font-bold text-[#453C45]">{g.amount ? formatVND(g.amount) : '—'}</p>
+                        <p className="text-[#827580]">{formatDateVN(g.createdAt)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB: THÔNG BÁO REALTIME                                     */}
+      {/* ========================================================= */}
+      {activeTab === 'notifications' && (
+        <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+          <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
+            <h3 className="font-heading font-bold text-sm text-[#453C45] flex items-center gap-2">
+              <Bell className="w-4 h-4 text-[#C76A82]" /> Hoạt động của khách mời (cập nhật tức thì)
+            </h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markNotificationsRead(notifications.filter((n) => !n.read).map((n) => n.id))}
+                className="text-xs text-[#C76A82] hover:underline cursor-pointer"
+              >
+                Đánh dấu đã đọc tất cả
+              </button>
+            )}
+          </div>
+          <div className="divide-y divide-neutral-100">
+            {notifications.length === 0 ? (
+              <p className="p-8 text-center text-xs text-[#827580]">
+                Chưa có thông báo. Khi khách mở thiệp, gửi lời chúc, xác nhận tham dự hoặc mừng cưới, bạn sẽ nhận được ngay tại đây.
+              </p>
+            ) : (
+              notifications.map((n) => {
+                const d = describeNotification(n);
+                const Icon = n.type === 'gift' ? Gift : n.type === 'wish' ? MessageSquare : n.type === 'rsvp' ? CheckCircle2 : Eye;
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => !n.read && markNotificationsRead([n.id])}
+                    className={`w-full text-left p-4 flex gap-3 text-xs hover:bg-neutral-50 cursor-pointer ${n.read ? '' : 'bg-[#FFF5F8]'}`}
+                  >
+                    <span className="w-8 h-8 rounded-full bg-[#F6DCE5] flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-[#C76A82]" />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className={`block text-[#453C45] ${n.read ? '' : 'font-bold'}`}>{d.title}</span>
+                      {d.body && <span className="block text-[#827580] truncate">{d.body}</span>}
+                      <span className="block text-[10px] text-neutral-400 mt-0.5">
+                        {new Date(n.createdAt).toLocaleString('vi-VN')} • {n.invitationTitle}
+                      </span>
+                    </span>
+                    {!n.read && <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedInv && (
+        <WishAlbum
+          isOpen={albumOpen}
+          onClose={() => setAlbumOpen(false)}
+          invitation={selectedInv}
+          wishes={wishes}
+          rsvps={rsvps}
+          gifts={gifts}
+          guests={guests}
+        />
+      )}
+
+      {/* Thêm nhiều khách */}
+      {bulkOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-3 text-xs">
+            <h3 className="font-heading font-bold text-base text-[#453C45]">Thêm Nhiều Khách Mời</h3>
+            <p className="text-[#827580]">Mỗi dòng một khách. Có thể thêm số điện thoại sau dấu phẩy. Mỗi khách sẽ có link & QR riêng.</p>
+            <textarea
+              rows={8}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={'Anh Nguyễn Văn An, 0912345678\nChị Trần Thu Hà\nGia đình chú Tư'}
+              className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-sm"
+            />
+            <select
+              value={bulkGroup}
+              onChange={(e) => setBulkGroup(e.target.value as Guest['group'])}
+              className="w-full px-3 py-2 rounded-xl border border-neutral-300"
+            >
+              <option value="family">Họ hàng, gia đình</option>
+              <option value="groom_friends">Bạn chú rể</option>
+              <option value="bride_friends">Bạn cô dâu</option>
+              <option value="colleagues">Đồng nghiệp</option>
+              <option value="other">Khác</option>
+            </select>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setBulkOpen(false)} className="flex-1 py-2 rounded-xl border border-neutral-300 font-semibold text-[#827580]">
+                Hủy
+              </button>
+              <button
+                onClick={handleBulkAdd}
+                disabled={bulkSaving}
+                className="flex-1 py-2 rounded-xl bg-[#C76A82] text-white font-bold hover:bg-[#B0596E] disabled:opacity-60"
+              >
+                {bulkSaving ? 'Đang thêm…' : `Thêm ${bulkText.split('\n').filter((l) => l.trim()).length} khách`}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1002,10 +1390,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {qrModalUrl && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl space-y-4">
-            <h3 className="font-heading font-bold text-base text-[#453C45]">Mã QR Thiệp Cưới</h3>
+            <h3 className="font-heading font-bold text-base text-[#453C45]">{qrTitle}</h3>
             <p className="text-xs text-[#827580]">
-              Quét mã bằng Zalo hoặc Camera để truy cập website thiệp.
+              Quét mã bằng Zalo hoặc Camera để mở thiệp.
             </p>
+            {qrLink && (
+              <button
+                onClick={() => copyToClipboard(qrLink, 'qr-link')}
+                className="w-full text-[11px] font-mono text-[#C76A82] bg-[#FFFBF7] border border-[#E8B7C8]/40 rounded-lg px-2 py-1.5 truncate cursor-pointer"
+                title="Sao chép link"
+              >
+                {copiedKey === 'qr-link' ? 'Đã sao chép link!' : qrLink}
+              </button>
+            )}
             <div className="w-56 h-56 mx-auto p-2 bg-[#FFFBF7] rounded-xl border border-[#E8B7C8]/40 shadow-inner flex items-center justify-center">
               <img src={qrModalUrl} alt="QR Code" className="w-full h-full object-contain" />
             </div>

@@ -1,10 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { generateQrDataUrl } from '../utils/formatters';
+import { buildDemoLink } from '../utils/engagement';
 import { Search, Sparkles, Filter, Check, Eye, Heart, ArrowRight, X } from 'lucide-react';
 import { WeddingTemplate, TemplateCategory } from '../types/wedding';
 import { WEDDING_TEMPLATES } from '../data/templates';
 import { TemplateFilterBar, filterTemplates, isPublishedTemplate, CollectionFilter, ColorFilter, templateSwatches } from './TemplateFilterBar';
 
 const PUBLISHED = WEDDING_TEMPLATES.filter(isPublishedTemplate);
+
+/** QR mở trang demo của mẫu thiệp trên điện thoại. */
+const DemoQr: React.FC<{ template: WeddingTemplate }> = ({ template }) => {
+  const [qr, setQr] = useState('');
+  const link = buildDemoLink(template.slug);
+  useEffect(() => {
+    generateQrDataUrl(link, '#453C45').then(setQr);
+  }, [link]);
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#FAF8F5] dark:bg-[#201A20] border border-[#E8B7C8]/30 dark:border-[#3D333D]">
+      {qr ? (
+        <img src={qr} alt={`QR demo ${template.name}`} className="w-24 h-24 rounded-lg bg-white p-1 shrink-0" />
+      ) : (
+        <div className="w-24 h-24 rounded-lg bg-white shrink-0" />
+      )}
+      <div className="text-xs text-[#453C45] dark:text-[#F5EDE8] space-y-1.5">
+        <p className="font-semibold">Quét mã QR để xem demo trực tiếp trên điện thoại</p>
+        <p className="text-[#827580] dark:text-[#B9A9B4]">Tạo miễn phí • Đổi mẫu bất cứ lúc nào khi chỉnh sửa</p>
+        <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#C76A82] font-semibold underline">
+          <Eye className="w-3.5 h-3.5" /> Xem demo
+        </a>
+      </div>
+    </div>
+  );
+};
 
 interface TemplateGalleryProps {
   onSelectTemplate: (template: WeddingTemplate) => void;
@@ -354,6 +381,8 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                       "{previewModalTemplate.defaultInvitationMessage}"
                     </p>
                   </div>
+
+                  <DemoQr template={previewModalTemplate} />
                 </div>
               </div>
 
