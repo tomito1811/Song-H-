@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { generateQrDataUrl } from '../utils/formatters';
 import { buildDemoLink } from '../utils/engagement';
+import { SampleAlbumStack } from './SampleAlbumStack';
+import { sampleAlbumFor } from '../data/sampleAlbum';
 import { Search, Sparkles, Filter, Check, Eye, Heart, ArrowRight, X } from 'lucide-react';
 import { WeddingTemplate, TemplateCategory } from '../types/wedding';
 import { WEDDING_TEMPLATES } from '../data/templates';
@@ -250,6 +252,8 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                   referrerPolicy="no-referrer"
                 />
 
+                {tpl.featured && <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />}
+
                 {/* Status Badges */}
                 <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5">
                   <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/95 dark:bg-[#1F1A1F]/90 text-[#453C45] dark:text-[#F5EDE8] shadow-xs backdrop-blur-xs">
@@ -380,6 +384,17 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                     <p className="italic text-[#453C45] dark:text-[#F5EDE8] bg-neutral-50 dark:bg-[#201A20] p-3 rounded-2xl border border-neutral-200 dark:border-[#3D333D] leading-relaxed">
                       "{previewModalTemplate.defaultInvitationMessage}"
                     </p>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold text-[#453C45] dark:text-[#F5EDE8] block mb-1.5">
+                      Album ảnh cưới trên thiệp (ảnh mẫu):
+                    </span>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {sampleAlbumFor(previewModalTemplate, true).map((src) => (
+                        <img key={src} src={src} alt="" loading="lazy" className="w-16 h-24 object-cover rounded-lg border border-[#E8B7C8]/40 shrink-0" />
+                      ))}
+                    </div>
                   </div>
 
                   <DemoQr template={previewModalTemplate} />

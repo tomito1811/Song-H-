@@ -28,6 +28,7 @@ import { TemplateFilterBar, filterTemplates, isPublishedTemplate, CollectionFilt
 import { PRICING_PLANS } from '../data/pricing';
 import { formatVND } from '../utils/formatters';
 import { SoftFocusRibbon } from './SoftFocusRibbon';
+import { SampleAlbumStack } from './SampleAlbumStack';
 
 interface HomePageProps {
   onNavigate: (view: string, params?: any) => void;
@@ -382,6 +383,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     {tpl.isPremium ? 'Mẫu Premium' : 'Mẫu Miễn Phí'}
                   </span>
                 </div>
+                <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />
               </div>
 
               <div className="p-5 flex-1 flex flex-col justify-between">
