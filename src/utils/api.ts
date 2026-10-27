@@ -24,6 +24,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { PRICING_PLANS } from '../data/pricing';
+import { randomToken, notifyOwner } from './engagement';
 
 const BASE_URL = '';
 
@@ -291,7 +292,7 @@ export async function createInvitation(payload: Partial<WeddingInvitation>): Pro
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('Vui lòng đăng nhập để tạo thiệp cưới.');
 
-  const newId = `inv-${Date.now()}`;
+  const newId = `inv-${randomToken(14)}`;
   const now = new Date().toISOString();
 
   // Generate URL slug
@@ -447,6 +448,11 @@ export async function togglePublishInvitation(
 
     const current = currentSnap.data() as WeddingInvitation;
     const nextStatus = current.status === 'published' ? 'draft' : 'published';
+    if (nextStatus === 'published') {
+      // Xuất bản luôn đi qua kiểm tra gói / lượt miễn phí
+      const published = await publishInvitation(id);
+      return { status: 'published', invitation: published };
+    }
     await updateDoc(invRef, { status: nextStatus, updatedAt: new Date().toISOString() });
 
     const fresh = await getDoc(invRef);
@@ -474,9 +480,10 @@ export async function fetchGuests(invitationId: string): Promise<Guest[]> {
 }
 
 export async function createGuest(invitationId: string, payload: Partial<Guest>): Promise<Guest> {
-  const newId = `gst-${Date.now()}`;
+  // ID khách = token bí mật dùng trong link riêng (?g=...), không đoán được
+  const token = randomToken(12);
+  const newId = `g${token}`;
   const now = new Date().toISOString();
-  const token = Math.random().toString(36).substring(2, 8);
 
   const newGuest: Guest = {
     id: newId,
@@ -527,7 +534,11 @@ export async function deleteGuest(invitationId: string, guestId: string): Promis
 // RSVP & WISHES
 // ==========================================
 
-export async function submitRsvp(slugOrId: string, payload: Partial<RSVP>): Promise<RSVP> {
+export async function submitRsvp(
+  slugOrId: string,
+  payload: Partial<RSVP>,
+  guestId?: string
+): Promise<RSVP> {
   // First resolve invitation ID if passed slug
   let invId = slugOrId;
   const inv = await fetchInvitationBySlug(slugOrId);
@@ -548,7 +559,41 @@ export async function submitRsvp(slugOrId: string, payload: Partial<RSVP>): Prom
   };
 
   try {
-    await setDoc(doc(db, 'invitations', invId, 'rsvps', newId), newRsvp);
+    await setDoc(doc(db, 'invitations', invId, 'rsvps', newId), { ...newRsvp, ...(guestId ? { guestId } : {}) });
+
+    // Cập nhật trạng thái khách mời có link riêng
+    if (guestId) {
+      await updateDoc(doc(db, 'invitations', invId, 'guests', guestId), {
+        rsvpStatus: newRsvp.isAttending ? 'attending' : 'declined',
+        attendeesCount: newRsvp.isAttending ? newRsvp.attendeesCount : 0,
+        respondedAt: newRsvp.createdAt,
+      }).catch((e) => console.warn('Không cập nhật được trạng thái khách:', e));
+    }
+
+    // Lời chúc kèm RSVP được lưu vào sổ lưu bút
+    if (newRsvp.message?.trim()) {
+      const wishId = `wish-${Date.now()}`;
+      await setDoc(doc(db, 'invitations', invId, 'wishes', wishId), {
+        id: wishId,
+        invitationId: invId,
+        senderName: newRsvp.guestName,
+        senderRelation: newRsvp.side === 'groom' ? 'Khách nhà trai' : newRsvp.side === 'bride' ? 'Khách nhà gái' : 'Bạn bè',
+        message: newRsvp.message,
+        isApproved: true,
+        createdAt: newRsvp.createdAt,
+      }).catch(() => {});
+    }
+
+    if (inv) {
+      await notifyOwner(inv, {
+        type: 'rsvp',
+        guestId,
+        guestName: newRsvp.guestName,
+        isAttending: newRsvp.isAttending,
+        attendeesCount: newRsvp.attendeesCount,
+        message: newRsvp.message,
+      });
+    }
     return newRsvp;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `invitations/${invId}/rsvps/${newId}`);
@@ -586,7 +631,8 @@ export async function fetchWishes(slugOrId: string): Promise<Wish[]> {
 
 export async function submitWish(
   slugOrId: string,
-  payload: { senderName: string; senderRelation: string; message: string }
+  payload: { senderName: string; senderRelation: string; message: string; signature?: string },
+  guestId?: string
 ): Promise<Wish> {
   let invId = slugOrId;
   const inv = await fetchInvitationBySlug(slugOrId);
@@ -601,10 +647,20 @@ export async function submitWish(
     message: payload.message || '',
     isApproved: true,
     createdAt: new Date().toISOString(),
+    ...(payload.signature && payload.signature.length < 300000 ? { signature: payload.signature } : {}),
+    ...(guestId ? { guestId } : {}),
   };
 
   try {
     await setDoc(doc(db, 'invitations', invId, 'wishes', newId), newWish);
+    if (inv) {
+      await notifyOwner(inv, {
+        type: 'wish',
+        guestId,
+        guestName: newWish.senderName,
+        message: newWish.message,
+      });
+    }
     return newWish;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `invitations/${invId}/wishes/${newId}`);
@@ -911,22 +967,29 @@ export async function publishInvitation(invitationId: string): Promise<WeddingIn
   const invData = snap.data() as WeddingInvitation;
   const isAdmin = isAdminUser(currentUser.email);
 
-  // If not admin, check user plan eligibility
-  if (!isAdmin) {
-    const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
-    const userPlan = userSnap.exists() ? (userSnap.data().plan || 'free') : 'free';
-    
-    // Check if card requires paid plan
-    const { WEDDING_TEMPLATES } = await import('../data/templates');
-    const tpl = WEDDING_TEMPLATES.find((t) => t.id === invData.templateId || t.slug === invData.templateId);
-    const isPremiumTemplate = Boolean(tpl?.isPremium);
-    const photoCount = invData.galleryImages?.length || 0;
-    const hasMusic = Boolean(invData.musicUrl && invData.musicUrl.trim() !== '');
-    const hasGiftBox = Boolean(invData.giftBank?.enabled);
+  let markFreeTrial = false;
 
-    const requiresPaid = isPremiumTemplate || photoCount > 5 || hasMusic || hasGiftBox;
-    if (requiresPaid && userPlan === 'free' && !invData.isPaid) {
-      throw new Error('Thiệp cưới đang sử dụng các tính năng cao cấp. Vui lòng thanh toán gói Premium hoặc Luxury để xuất bản.');
+  // Không phải admin: kiểm tra gói. Mỗi tài khoản được 1 thiệp miễn phí ĐẦY ĐỦ tính năng.
+  if (!isAdmin) {
+    const userRef = doc(db, 'users', currentUser.uid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    const userPlan = userData.plan || 'free';
+    const planActive =
+      (userPlan === 'premium' || userPlan === 'luxury') &&
+      (!userData.planExpiresAt || new Date(userData.planExpiresAt).getTime() > Date.now());
+
+    if (!planActive && !invData.isPaid) {
+      const freeStatus = await getFreeTrialStatus(invitationId);
+      if (!freeStatus.available) {
+        throw new Error(
+          'Bạn đã sử dụng lượt tạo thiệp miễn phí cho tài khoản này. Vui lòng chọn gói Premium hoặc Luxury để xuất bản thêm thiệp.'
+        );
+      }
+      markFreeTrial = true;
+      await updateDoc(userRef, { freeInvitationId: invitationId }).catch((e) =>
+        console.warn('Không ghi được lượt miễn phí:', e)
+      );
     }
   }
 
@@ -935,10 +998,40 @@ export async function publishInvitation(invitationId: string): Promise<WeddingIn
     status: 'published',
     publishedAt: invData.publishedAt || now,
     updatedAt: now,
+    ...(markFreeTrial ? { isFreeTrial: true, selectedPlanId: 'free' } : {}),
   });
 
   const fresh = await getDoc(invRef);
   return { ...(fresh.data() as WeddingInvitation), id: fresh.id };
+}
+
+/**
+ * Kiểm tra lượt thiệp miễn phí của tài khoản hiện tại.
+ * available = true nếu chưa dùng, hoặc chính thiệp `invitationId` là thiệp đã dùng lượt free.
+ */
+export async function getFreeTrialStatus(
+  invitationId?: string
+): Promise<{ available: boolean; usedInvitationId?: string }> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return { available: true };
+  try {
+    const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+    const usedId: string | undefined = userSnap.exists() ? userSnap.data().freeInvitationId || undefined : undefined;
+    if (usedId) {
+      return { available: usedId === invitationId, usedInvitationId: usedId };
+    }
+    // Tài khoản cũ: coi thiệp đã xuất bản mà chưa thanh toán là đã dùng lượt free
+    const snap = await getDocs(query(collection(db, 'invitations'), where('userId', '==', currentUser.uid)));
+    let legacy: string | undefined;
+    snap.forEach((d) => {
+      const data = d.data() as WeddingInvitation;
+      if (d.id !== invitationId && data.status === 'published' && !data.isPaid) legacy = d.id;
+    });
+    return legacy ? { available: false, usedInvitationId: legacy } : { available: true };
+  } catch (err) {
+    console.warn('Không kiểm tra được lượt miễn phí:', err);
+    return { available: true };
+  }
 }
 
 export async function approveOrderManually(orderId: string, note?: string): Promise<Order> {
