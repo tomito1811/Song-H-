@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>THIEPONL — Nền Tảng Thiệp Cưới Điện Tử & AI Designer</title>
+    <meta name="description" content="Tự tay tạo thiệp cưới online đẹp như một câu chuyện tình yêu. Xuất bản website đám cưới, quản lý RSVP, tạo mã QR và thiết kế thiệp bằng AI." />
+    <meta property="og:title" content="THIEPONL — Nền Tảng Thiệp Cưới Điện Tử & AI Designer" />
+    <meta property="og:description" content="Tự tay tạo thiệp cưới online đẹp như một câu chuyện tình yêu. Xuất bản website đám cưới, quản lý RSVP, tạo mã QR và thiết kế thiệp bằng AI." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/assets/aistudio/thiep-online_1c938423.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="/assets/aistudio/thiep-online_1c938423.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Alex+Brush&family=Great+Vibes&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        // Intercept and demote non-fatal Google Token Service disabled error logs to console.warn
+        var origConsoleError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var text = args.map(function(a) {
+            try {
+              return typeof a === 'object' ? JSON.stringify(a) : String(a);
+            } catch(e) {
+              return String(a);
+            }
+          }).join(' ');
+
+          if (
+            text.indexOf('token-service-api-has-not-been-used') !== -1 ||
+            text.indexOf('securetoken.googleapis.com') !== -1 ||
+            text.indexOf('Could not reach Cloud Firestore backend') !== -1
+          ) {
+            console.warn('[Handled Firebase Service Warning]:', text);
+            return;
+          }
+          return origConsoleError.apply(console, arguments);
+        };
+
+        try {
+          var t = localStorage.getItem('thieponl_theme') || 'system';
+          var d = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (d) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

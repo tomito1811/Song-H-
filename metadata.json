@@ -1,0 +1,6 @@
+{
+  "name": "THIEPONL - Nền Tảng Thiệp Cưới Điện Tử & AI Designer",
+  "description": "Tự tay tạo thiệp cưới online đẹp như một câu chuyện tình yêu. Xuất bản website đám cưới, quản lý RSVP, tạo mã QR và thiết kế thiệp bằng AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
