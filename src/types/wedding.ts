@@ -35,7 +35,63 @@ export interface DesignConfig {
   heroLayout: 'centered' | 'split-left' | 'split-right' | 'card-overlay' | 'editorial';
   backgroundPattern?: 'none' | 'dots' | 'floral-corners' | 'arch-glow' | 'paper-texture';
   musicPreset?: string;
+  /**
+   * Thiết kế minh họa gốc (bộ sưu tập cao cấp). Khi có giá trị, thiệp hiển thị
+   * bằng InvitationArtCard (SVG + chữ HTML) thay cho ảnh bìa mặc định.
+   * Trường tùy chọn: các mẫu cũ và thiệp đã lưu không bị ảnh hưởng.
+   */
+  motif?: TemplateMotif;
 }
+
+export type MotifId =
+  | 'song-hy'
+  | 'long-phung'
+  | 'minimal-monogram'
+  | 'thanh-diep'
+  | 'lien-hoa'
+  | 'vuon-kinh'
+  | 'baroque'
+  | 'santorini'
+  | 'bach-su'
+  | 'nhat-binh'
+  | 'chibi'
+  | 'hoa-kho';
+
+export interface TemplateMotif {
+  id: MotifId;
+  /** Biến thể chi tiết trang trí trong cùng ngôn ngữ thiết kế (vd. 'v2', 'dark'). */
+  variant?: string;
+  /** Màu nền của tấm thiệp minh họa. */
+  ground: string;
+  /** Màu chủ đạo của họa tiết & tên cô dâu chú rể. */
+  ink: string;
+  /** Màu ánh kim / nhấn cho đường viền, hoa văn. */
+  metal: string;
+  /** Màu phụ (cánh hoa, lá, mảng nhẹ). */
+  soft?: string;
+  /** Màu chữ thông tin (ngày, địa điểm). Mặc định tự chọn theo độ tương phản. */
+  text?: string;
+}
+
+/** 6 nhóm chủ đề của bộ sưu tập cao cấp. */
+export type TemplateCollection =
+  | 'truyen-thong'
+  | 'toi-gian'
+  | 'hoa-la'
+  | 'hoang-gia'
+  | 'co-phuc'
+  | 'nghe-thuat';
+
+export type ColorTag =
+  | 'do'
+  | 'hong'
+  | 'xanh-la'
+  | 'xanh-duong'
+  | 'vang'
+  | 'trung-tinh'
+  | 'tim'
+  | 'cam'
+  | 'den';
 
 export interface WeddingTemplate {
   id: string;
@@ -51,6 +107,15 @@ export interface WeddingTemplate {
   design: DesignConfig;
   defaultInvitationMessage: string;
   defaultThankYouMessage: string;
+  // ---- Metadata bổ sung (tùy chọn, chỉ dùng cho bộ sưu tập mới) ----
+  collection?: TemplateCollection;
+  colorTags?: ColorTag[];
+  /** Tên màu hiển thị, vd. "Đỏ son". */
+  colorName?: string;
+  /** Chỉ hiển thị khi 'published'. Mẫu cũ không có trường này được coi là đã xuất bản. */
+  status?: 'published' | 'draft';
+  sortOrder?: number;
+  featured?: boolean;
 }
 
 export interface LoveStoryItem {
