@@ -71,7 +71,21 @@ export type MotifId =
   | 'bach-su'
   | 'nhat-binh'
   | 'chibi'
-  | 'hoa-kho';
+  | 'hoa-kho'
+  // Thiệp sự kiện
+  | 'balloons'
+  | 'cake'
+  | 'confetti'
+  | 'house'
+  | 'keys-plant'
+  | 'baby-cloud'
+  | 'baby-bear'
+  | 'ribbon-cut'
+  | 'firework'
+  | 'grad-cap';
+
+/** Loại thiệp. Không đặt = thiệp cưới. */
+export type EventType = 'wedding' | 'birthday' | 'housewarming' | 'baby' | 'opening' | 'graduation';
 
 export interface TemplateMotif {
   id: MotifId;
@@ -87,6 +101,8 @@ export interface TemplateMotif {
   soft?: string;
   /** Màu chữ thông tin (ngày, địa điểm). Mặc định tự chọn theo độ tương phản. */
   text?: string;
+  /** Dòng chữ nhỏ phía trên tên (ghi đè mặc định của motif), vd. "Tiệc Sinh Nhật". */
+  kicker?: string;
 }
 
 /** 6 nhóm chủ đề của bộ sưu tập cao cấp. */
@@ -132,6 +148,8 @@ export interface WeddingTemplate {
   status?: 'published' | 'draft';
   sortOrder?: number;
   featured?: boolean;
+  /** Loại thiệp (mặc định: thiệp cưới). */
+  eventType?: EventType;
 }
 
 export interface LoveStoryItem {
@@ -185,6 +203,8 @@ export interface WeddingInvitation {
   orderId?: string;
   publishedAt?: string;
   templateId: string;
+  /** Loại thiệp (mặc định: thiệp cưới). Với thiệp sự kiện: groomName = tên chính, brideName = dòng phụ. */
+  eventType?: EventType;
   brideName: string;
   groomName: string;
   brideTitle?: string; // e.g. Cô dâu
