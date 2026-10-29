@@ -395,6 +395,10 @@ export interface AIDesignProposal {
   invitationMessage: string;
   ornamentStyle: 'botanical' | 'minimal-lines' | 'vintage-flourish' | 'traditional-knot' | 'sparkle' | 'none';
   previewColor: string;
+  /** Mẫu thiệp thật được đề xuất (áp dụng sẽ dựng thiệp từ mẫu này). */
+  templateId?: string;
+  groomName?: string;
+  brideName?: string;
 }
 
 export interface AdminAction {
