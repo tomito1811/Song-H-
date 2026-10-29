@@ -25,6 +25,7 @@ import {
 } from 'firebase/firestore';
 import { PRICING_PLANS } from '../data/pricing';
 import { randomToken, notifyOwner } from './engagement';
+import { nextExpiry, effectivePlan } from '../data/planRules';
 
 const BASE_URL = '';
 
@@ -138,7 +139,8 @@ export async function getCurrentUser(): Promise<User | null> {
         displayName: data.displayName || currentUser.displayName || 'Cặp Đôi',
         photoURL: data.photoURL || currentUser.photoURL || '',
         role: isAdmin ? 'admin' : (data.role || 'user'),
-        plan: data.plan || 'free',
+        // Gói hết hạn tự quay về Free
+        plan: isAdmin ? (data.plan || 'free') : effectivePlan({ plan: data.plan || 'free', planExpiresAt: data.planExpiresAt, role: 'user' }),
         planExpiresAt: data.planExpiresAt || undefined,
         theme: data.theme || undefined,
         createdAt: data.createdAt || now,
@@ -883,7 +885,9 @@ export async function simulateDevPayment(orderId: string): Promise<{ order: Orde
     const orderData = snap.data() as Order;
     const now = new Date();
     const paidAt = now.toISOString();
-    const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const userSnapSim = orderData.userId ? await getDoc(doc(db, 'users', orderData.userId)).catch(() => null) : null;
+    const curExp = userSnapSim?.exists() && userSnapSim.data().plan === orderData.planId ? userSnapSim.data().planExpiresAt : null;
+    const expiresAt = nextExpiry(orderData.planId as any, curExp, now);
 
     // 1. Mark order as paid
     await updateDoc(orderRef, {
@@ -1025,13 +1029,23 @@ export async function publishInvitation(invitationId: string): Promise<WeddingIn
       (!userData.planExpiresAt || new Date(userData.planExpiresAt).getTime() > Date.now());
 
     if (!planActive && !invData.isPaid) {
+      // Gói Free không dùng mẫu HOT / mẫu cao cấp
+      const { WEDDING_TEMPLATES } = await import('../data/templates');
+      const tpl = WEDDING_TEMPLATES.find((t) => t.id === invData.templateId || t.slug === invData.templateId);
+      if (tpl?.isPremium || tpl?.hot) {
+        throw new Error('Mẫu thiệp này thuộc gói PRO. Vui lòng nâng cấp gói PRO (299.000đ) để xuất bản, hoặc chọn mẫu miễn phí.');
+      }
       const freeStatus = await getFreeTrialStatus(invitationId);
       if (!freeStatus.available) {
         throw new Error(
-          'Bạn đã sử dụng lượt tạo thiệp miễn phí cho tài khoản này. Vui lòng chọn gói Premium hoặc Luxury để xuất bản thêm thiệp.'
+          freeStatus.reason === 'device'
+            ? 'Thiết bị / mạng này đã dùng lượt thiệp miễn phí cho một tài khoản khác. Vui lòng nâng cấp gói PRO để tạo thêm thiệp.'
+            : 'Bạn đã sử dụng lượt tạo thiệp miễn phí cho tài khoản này. Vui lòng nâng cấp gói PRO hoặc LUXURY để xuất bản thêm thiệp.'
         );
       }
       markFreeTrial = true;
+      const { deviceKeys, claimDevice } = await import('./deviceClaim');
+      await claimDevice(currentUser.uid, invitationId, await deviceKeys());
       await updateDoc(userRef, { freeInvitationId: invitationId }).catch((e) =>
         console.warn('Không ghi được lượt miễn phí:', e)
       );
@@ -1056,10 +1070,14 @@ export async function publishInvitation(invitationId: string): Promise<WeddingIn
  */
 export async function getFreeTrialStatus(
   invitationId?: string
-): Promise<{ available: boolean; usedInvitationId?: string }> {
+): Promise<{ available: boolean; usedInvitationId?: string; reason?: 'account' | 'device' }> {
   const currentUser = auth.currentUser;
   if (!currentUser) return { available: true };
   try {
+    const { deviceKeys, deviceClaimedByOther } = await import('./deviceClaim');
+    if (await deviceClaimedByOther(currentUser.uid, await deviceKeys())) {
+      return { available: false, reason: 'device' };
+    }
     const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
     const usedId: string | undefined = userSnap.exists() ? userSnap.data().freeInvitationId || undefined : undefined;
     if (usedId) {
@@ -1092,8 +1110,12 @@ export async function approveOrderManually(orderId: string, note?: string): Prom
     const orderData = snap.data() as Order;
 
     const now = new Date();
-    const expiry = new Date(now);
-    expiry.setFullYear(expiry.getFullYear() + 1);
+    let curExp: string | null = null;
+    if (orderData.userId) {
+      const us = await getDoc(doc(db, 'users', orderData.userId)).catch(() => null);
+      if (us?.exists() && us.data().plan === orderData.planId) curExp = us.data().planExpiresAt || null;
+    }
+    const expiry = new Date(nextExpiry(orderData.planId as any, curExp, now));
 
     await updateDoc(orderRef, {
       status: 'manual_approved',

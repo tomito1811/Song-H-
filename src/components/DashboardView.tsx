@@ -37,6 +37,7 @@ import {
 } from '../utils/engagement';
 import { fetchRsvps, fetchWishes } from '../utils/api';
 import { WishAlbum } from './WishAlbum';
+import { FREE_GUEST_LIMIT, isPlanActive, daysLeft, PLAN_LABEL, effectivePlan } from '../data/planRules';
 import { InvitationArtCard } from './templateArt/InvitationArtCard';
 import {
   fetchInvitations,
@@ -222,6 +223,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (!selectedInvForGuests) return;
     const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
+    if (!guardGuestLimit(lines.length)) return;
     setBulkSaving(true);
     try {
       const added: Guest[] = [];
@@ -252,9 +254,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   // Add guest
+  /** Gói Free: tối đa 20 khách / thiệp. PRO, LUXURY hoặc thiệp đã thanh toán: không giới hạn. */
+  const guestLimit = (): number => {
+    const inv = invitations.find((i) => i.id === selectedInvForGuests);
+    return isPlanActive(currentUser) || inv?.isPaid ? Infinity : FREE_GUEST_LIMIT;
+  };
+  const guardGuestLimit = (adding: number): boolean => {
+    const limit = guestLimit();
+    if (guests.length + adding > limit) {
+      alert(`Gói Miễn Phí chỉ mời tối đa ${limit} khách cho mỗi thiệp (hiện có ${guests.length}). Nâng cấp gói PRO để mời không giới hạn.`);
+      setUpgradeModalOpen(true);
+      return false;
+    }
+    return true;
+  };
+
   const handleAddGuest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvForGuests || !newGuestData.name.trim()) return;
+    if (!guardGuestLimit(1)) return;
     try {
       const added = await createGuest(selectedInvForGuests, newGuestData);
       setGuests([...guests, added]);
@@ -393,7 +411,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#B6925B] text-[#B6925B] bg-[#FCFBF7] hover:bg-[#F8F4EC] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Nâng Cấp Gói ({currentUser.plan.toUpperCase()})
+            {isPlanActive(currentUser) && currentUser.role !== 'admin'
+              ? `${PLAN_LABEL[effectivePlan(currentUser)]} · còn ${daysLeft(currentUser.planExpiresAt)} ngày — Gia hạn`
+              : 'Nâng Cấp Gói PRO'}
           </button>
           <button
             onClick={onNavigateToTemplates}
@@ -712,7 +732,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="px-3.5 py-1.5 rounded-xl bg-[#C76A82] text-white text-xs font-bold hover:bg-[#B0596E] flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Thêm Khách Mới
+                Thêm Khách Mới {guestLimit() !== Infinity && `(${guests.length}/${FREE_GUEST_LIMIT})`}
               </button>
             </div>
           </div>
@@ -1253,9 +1273,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
-                    <span className="text-xs font-bold text-[#C76A82] uppercase block">Gói Premium</span>
+                    <span className="text-xs font-bold text-[#C76A82] uppercase block">Gói PRO · 15 ngày</span>
                     <span className="font-heading text-lg font-bold text-[#453C45] block mt-1">299.000 đ</span>
-                    <p className="text-[11px] text-[#827580] mt-1">3 thiệp cưới, 25 ảnh, mở khóa 22+ mẫu, RSVP & QR.</p>
+                    <p className="text-[11px] text-[#827580] mt-1">Mở mẫu HOT & toàn bộ mẫu, không giới hạn khách mời.</p>
                   </div>
 
                   <div
@@ -1266,9 +1286,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
-                    <span className="text-xs font-bold text-[#B6925B] uppercase block">Gói Luxury</span>
+                    <span className="text-xs font-bold text-[#B6925B] uppercase block">Gói LUXURY · 3 tháng</span>
                     <span className="font-heading text-lg font-bold text-[#453C45] block mt-1">599.000 đ</span>
-                    <p className="text-[11px] text-[#827580] mt-1">Không giới hạn thiệp, AI Designer không giới hạn.</p>
+                    <p className="text-[11px] text-[#827580] mt-1">Toàn bộ quyền lợi PRO, gia hạn sử dụng 3 tháng.</p>
                   </div>
                 </div>
 

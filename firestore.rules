@@ -35,7 +35,7 @@ service cloud.firestore {
 
     // USERS
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || isPaymentBot();
       // Tài khoản mới luôn bắt đầu ở gói free; gói trả phí chỉ do webhook SePay / Admin ghi
       allow create: if isAdmin() || isPaymentBot() || (isOwner(userId) && request.resource.data.plan == 'free' && request.resource.data.role == 'user');
       // Lượt miễn phí chỉ được ghi 1 lần; người dùng không tự đổi gói, hạn gói, quyền
@@ -104,6 +104,13 @@ service cloud.firestore {
       allow get: if true;
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // FREE CLAIMS — mỗi thiết bị / IP chỉ dùng 1 lượt thiệp miễn phí (chỉ tạo, không sửa/xóa)
+    match /freeClaims/{claimId} {
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin();
     }
 
     // ORDERS

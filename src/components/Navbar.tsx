@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Menu, X, Heart, ShieldCheck, User, LogOut } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { effectivePlan, PLAN_LABEL } from '../data/planRules';
 import { auth, fbSignOut } from '../firebase';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -109,11 +110,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E8B7C8]/40 dark:border-[#3D333D] hover:bg-[#F6DCE5]/30 dark:hover:bg-[#2A232A] text-xs font-medium text-[#453C45] dark:text-[#F5EDE8] transition-colors cursor-pointer"
                 >
                   {currentUser.photoURL ? (
-                    <img src={currentUser.photoURL} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    <span className="relative inline-flex shrink-0">
+                    <img src={currentUser.photoURL} alt="" className={`w-6 h-6 rounded-full object-cover ${effectivePlan(currentUser) !== 'free' ? 'ring-2 ring-[#D4A73C]' : ''}`} />
+                    {effectivePlan(currentUser) !== 'free' && (
+                      <span className="absolute -bottom-1.5 -right-2 px-1 rounded text-[8px] font-black leading-[12px] text-white shadow" style={{ background: effectivePlan(currentUser) === 'luxury' ? 'linear-gradient(135deg,#B6925B,#E9C46A)' : 'linear-gradient(135deg,#C76A82,#E8546F)' }}>
+                        {PLAN_LABEL[effectivePlan(currentUser)]}
+                      </span>
+                    )}
+                  </span>
                   ) : (
                     <div className="w-6 h-6 rounded-full bg-[#E8B7C8]/40 dark:bg-[#E8B7C8]/20 flex items-center justify-center text-[#C76A82] dark:text-[#E8B7C8] font-bold text-xs">
                       {currentUser.name ? currentUser.name[0].toUpperCase() : 'U'}
                     </div>
+                  )}
+                  {!currentUser.photoURL && effectivePlan(currentUser) !== 'free' && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black text-white" style={{ background: effectivePlan(currentUser) === 'luxury' ? 'linear-gradient(135deg,#B6925B,#E9C46A)' : 'linear-gradient(135deg,#C76A82,#E8546F)' }}>
+                      {PLAN_LABEL[effectivePlan(currentUser)]}
+                    </span>
                   )}
                   <span className="max-w-[110px] truncate">{currentUser.name}</span>
                   {currentUser.role === 'admin' && (
@@ -242,11 +255,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2 text-xs text-[#453C45] dark:text-[#F5EDE8] font-medium">
                   {currentUser.photoURL ? (
-                    <img src={currentUser.photoURL} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    <span className="relative inline-flex shrink-0">
+                    <img src={currentUser.photoURL} alt="" className={`w-6 h-6 rounded-full object-cover ${effectivePlan(currentUser) !== 'free' ? 'ring-2 ring-[#D4A73C]' : ''}`} />
+                    {effectivePlan(currentUser) !== 'free' && (
+                      <span className="absolute -bottom-1.5 -right-2 px-1 rounded text-[8px] font-black leading-[12px] text-white shadow" style={{ background: effectivePlan(currentUser) === 'luxury' ? 'linear-gradient(135deg,#B6925B,#E9C46A)' : 'linear-gradient(135deg,#C76A82,#E8546F)' }}>
+                        {PLAN_LABEL[effectivePlan(currentUser)]}
+                      </span>
+                    )}
+                  </span>
                   ) : (
                     <div className="w-6 h-6 rounded-full bg-[#E8B7C8]/40 dark:bg-[#E8B7C8]/20 flex items-center justify-center text-[#C76A82] dark:text-[#E8B7C8] font-bold text-xs">
                       {currentUser.name ? currentUser.name[0].toUpperCase() : 'U'}
                     </div>
+                  )}
+                  {!currentUser.photoURL && effectivePlan(currentUser) !== 'free' && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black text-white" style={{ background: effectivePlan(currentUser) === 'luxury' ? 'linear-gradient(135deg,#B6925B,#E9C46A)' : 'linear-gradient(135deg,#C76A82,#E8546F)' }}>
+                      {PLAN_LABEL[effectivePlan(currentUser)]}
+                    </span>
                   )}
                   <span>{currentUser.name}</span>
                   {currentUser.role === 'admin' && (

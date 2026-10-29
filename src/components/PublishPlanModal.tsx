@@ -57,6 +57,7 @@ export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
   // Mỗi tài khoản Gmail được 1 thiệp miễn phí đầy đủ tính năng.
   const freeDisqualifiers: string[] = [];
   if (!freeTrialAvailable) freeDisqualifiers.push('tài khoản đã dùng lượt thiệp miễn phí');
+  if (template?.isPremium || template?.hot) freeDisqualifiers.push('chọn mẫu HOT / cao cấp (chỉ dành cho gói PRO)');
 
   const isFreeEligible = freeDisqualifiers.length === 0;
 
@@ -190,7 +191,7 @@ export const PublishPlanModal: React.FC<PublishPlanModalProps> = ({
                         <span>Chưa đủ điều kiện:</span>
                       </div>
                       <p className="leading-snug">
-                        Bạn đã {freeDisqualifiers.join(', ')}. Hãy chọn gói trả phí để xuất bản thêm thiệp.
+                        Bạn đã {freeDisqualifiers.join(' và ')}. Hãy chọn gói PRO hoặc LUXURY để xuất bản.
                       </p>
                     </div>
                   )}

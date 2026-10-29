@@ -352,6 +352,8 @@ export interface PricingPlan {
   maxPhotos: number;
   aiGenerations: number;
   isPopular?: boolean;
+  /** Số ngày sử dụng của gói (0 = không hết hạn). */
+  durationDays?: number;
 }
 
 export interface Order {

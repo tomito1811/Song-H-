@@ -21,7 +21,7 @@ export const HOT_TEMPLATES: WeddingTemplate[] = HOT_THEMES.map((t, i) => {
     thumbnail: t.photos.hero,
     preview: t.photos.hero,
     description: t.tagline,
-    isPremium: i >= 4,
+    isPremium: true,
     design: {
       fontHeading: 'Cormorant Garamond, serif',
       fontBody: 'Plus Jakarta Sans, sans-serif',
