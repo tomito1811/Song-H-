@@ -825,7 +825,9 @@ export async function createOrder(
   };
 
   try {
-    await setDoc(doc(db, 'orders', orderId), order);
+    // Firestore không nhận giá trị undefined (vd. nâng gói từ bảng điều khiển không gắn thiệp)
+    const orderDoc = Object.fromEntries(Object.entries(order).filter(([, v]) => v !== undefined));
+    await setDoc(doc(db, 'orders', orderId), orderDoc);
 
     // If attached to an invitation, mark invitation as pending_payment
     if (invitationId) {
