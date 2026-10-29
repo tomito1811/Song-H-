@@ -16,6 +16,11 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/invitations/$(invitationId)).data.userId == request.auth.uid;
     }
 
+    // Tài khoản máy dùng riêng cho webhook SePay (đăng nhập Email/Password từ Cloudflare Worker)
+    function isPaymentBot() {
+      return isSignedIn() && request.auth.token.email == 'sepay-bot@thieponl.vn';
+    }
+
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'contact.media.vnn@gmail.com' ||
@@ -32,9 +37,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       // Tài khoản mới luôn bắt đầu ở gói free; gói trả phí chỉ do webhook SePay / Admin ghi
-      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.plan == 'free' && request.resource.data.role == 'user');
+      allow create: if isAdmin() || isPaymentBot() || (isOwner(userId) && request.resource.data.plan == 'free' && request.resource.data.role == 'user');
       // Lượt miễn phí chỉ được ghi 1 lần; người dùng không tự đổi gói, hạn gói, quyền
-      allow update: if isAdmin() || (isOwner(userId)
+      allow update: if isAdmin() || isPaymentBot() || (isOwner(userId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'planExpiresAt', 'role'])
         && (!('freeInvitationId' in resource.data) || resource.data.freeInvitationId == null ||
             request.resource.data.freeInvitationId == resource.data.freeInvitationId));
@@ -47,7 +52,7 @@ service cloud.firestore {
       allow create: if isAdmin() || (isSignedIn() && request.resource.data.userId == request.auth.uid
         && (!('isPaid' in request.resource.data) || request.resource.data.isPaid == false));
       // Chủ thiệp không tự đánh dấu "đã thanh toán" (chỉ webhook SePay / Admin)
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid
+      allow update: if isAdmin() || isPaymentBot() || (isSignedIn() && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPaid']));
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
@@ -103,12 +108,12 @@ service cloud.firestore {
 
     // ORDERS
     match /orders/{orderId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin() || isPaymentBot();
       // Đơn mới luôn ở trạng thái chờ thanh toán
       allow create: if isAdmin() || (isSignedIn() && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'pending');
       // Khách chỉ được hủy đơn của mình; xác nhận thanh toán do webhook SePay / Admin
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid
+      allow update: if isAdmin() || isPaymentBot() || (isSignedIn() && resource.data.userId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.status == 'cancelled');
     }
@@ -116,7 +121,8 @@ service cloud.firestore {
     // PAYMENTS
     match /payments/{paymentId} {
       allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create, update: if isAdmin();
+      allow create: if isAdmin() || isPaymentBot();
+      allow update: if isAdmin();
     }
 
     // ADMIN ACTIONS
