@@ -9,22 +9,25 @@ Luồng hoạt động:
 
 Web trên GitHub Pages là trang tĩnh nên cần Worker nhỏ này để nhận webhook. Cloudflare Workers miễn phí 100.000 lượt/ngày, không cần thẻ.
 
-## Bước 1 — Lấy khóa tài khoản dịch vụ Firebase
+## Bước 1 — Tạo tài khoản máy "sepay-bot" trong Firebase
 
-1. Mở https://console.firebase.google.com/project/fresh-nexus-75v9p/settings/serviceaccounts/adminsdk
-2. Bấm **Generate new private key** → **Generate key** → tải về file `.json`.
-3. Giữ file này bí mật (không gửi cho ai, không đưa lên GitHub).
+Dự án Firebase thuộc gói AI Studio nên không tạo được khóa tài khoản dịch vụ. Thay vào đó Worker đăng nhập bằng một tài khoản máy riêng; luật Firestore chỉ cho đúng tài khoản này xác nhận thanh toán.
+
+1. Bật đăng nhập Email/Password: https://console.firebase.google.com/project/fresh-nexus-75v9p/authentication/providers → **Add new provider** → **Email/Password** → bật **Enable** → **Save**.
+2. Tạo tài khoản: https://console.firebase.google.com/project/fresh-nexus-75v9p/authentication/users → **Add user**
+   - Email: `sepay-bot@thieponl.vn` (đúng chính xác email này — luật Firestore nhận diện theo email)
+   - Password: một mật khẩu mạnh (giữ bí mật)
 
 ## Bước 2 — Tạo Worker trên Cloudflare
 
 1. Đăng ký/đăng nhập https://dash.cloudflare.com → **Workers & Pages** → **Create** → **Create Worker**.
 2. Đặt tên `songhy-sepay` → **Deploy**.
 3. Bấm **Edit code**, xóa code mẫu, dán toàn bộ nội dung file `worker.js` → **Deploy**.
-4. Vào **Settings → Variables and Secrets**, thêm 3 biến (chọn loại **Secret**):
-   - `SEPAY_API_KEY` = một chuỗi bí mật bạn tự đặt (ví dụ chuỗi mình tạo sẵn trong tin nhắn).
-   - `FIREBASE_SERVICE_ACCOUNT` = dán **toàn bộ nội dung** file `.json` ở Bước 1.
-   - `FIRESTORE_DATABASE` = `ai-studio-thieponlnntngthi-7150013d-11a3-4714-ab0b-607155d1b9f3`
-5. Ghi lại địa chỉ Worker, dạng `https://songhy-sepay.<tên-bạn>.workers.dev`. Mở địa chỉ đó trên trình duyệt phải thấy `{"ok":true,...}`.
+4. Vào **Settings → Variables and Secrets**, thêm 3 biến loại **Secret**:
+   - `SEPAY_API_KEY` = chuỗi bí mật bạn tự đặt (dùng lại ở SePay)
+   - `BOT_EMAIL` = `sepay-bot@thieponl.vn`
+   - `BOT_PASSWORD` = mật khẩu ở Bước 1
+5. Ghi lại địa chỉ Worker, dạng `https://songhy-sepay.<tên-bạn>.workers.dev`. Mở trên trình duyệt phải thấy `{"ok":true,...}`.
 
 ## Bước 3 — Cấu hình SePay
 

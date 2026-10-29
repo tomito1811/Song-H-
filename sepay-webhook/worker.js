@@ -3,9 +3,14 @@
  * Chạy trên Cloudflare Workers (miễn phí). GitHub Pages là web tĩnh nên cần dịch vụ nhỏ này nhận webhook.
  *
  * Biến môi trường (Settings → Variables and Secrets của Worker):
- *   SEPAY_API_KEY             — khóa bạn đặt trong SePay (Webhook → Kiểu chứng thực "API Key")
- *   FIREBASE_SERVICE_ACCOUNT  — toàn bộ nội dung file JSON tài khoản dịch vụ Firebase
- *   FIRESTORE_DATABASE        — tên database (vd: ai-studio-thieponlnntngthi-7150013d-11a3-4714-ab0b-607155d1b9f3)
+ *   SEPAY_API_KEY       — khóa bạn đặt trong SePay (Webhook → Kiểu chứng thực "API Key")
+ *   BOT_EMAIL           — sepay-bot@thieponl.vn (tài khoản Email/Password tạo trong Firebase Authentication)
+ *   BOT_PASSWORD        — mật khẩu của tài khoản trên
+ * Không bắt buộc (đã có mặc định):
+ *   FIREBASE_API_KEY, FIREBASE_PROJECT_ID, FIRESTORE_DATABASE
+ *
+ * Worker đăng nhập bằng tài khoản máy "sepay-bot" → mọi thao tác ghi vẫn đi qua luật Firestore
+ * (luật chỉ cho tài khoản này đánh dấu đơn đã thanh toán & nâng gói).
  *
  * SePay gửi POST JSON: { id, gateway, transactionDate, accountNumber, content, transferType, transferAmount, referenceCode, ... }
  * Nội dung chuyển khoản chứa mã đơn TOPxxxxxx do web tạo.
@@ -112,11 +117,16 @@ async function handleTransaction(tx, env) {
 
 /* ================= Firestore REST + Service Account ================= */
 
+const DEFAULTS = {
+  FIREBASE_API_KEY: 'AIzaSyDVhxXxaDpeiuj0WdArYkOQOOzAoNg6NJk',
+  FIREBASE_PROJECT_ID: 'fresh-nexus-75v9p',
+  FIRESTORE_DATABASE: 'ai-studio-thieponlnntngthi-7150013d-11a3-4714-ab0b-607155d1b9f3',
+};
+
 async function firestore(env) {
-  const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
-  const db = env.FIRESTORE_DATABASE || '(default)';
-  const token = await accessToken(sa);
-  const root = `projects/${sa.project_id}/databases/${db}`;
+  const cfg = { ...DEFAULTS, ...Object.fromEntries(Object.entries(env).filter(([, v]) => typeof v === 'string' && v)) };
+  const token = env.FIREBASE_SERVICE_ACCOUNT ? await accessToken(JSON.parse(env.FIREBASE_SERVICE_ACCOUNT)) : await botToken(cfg);
+  const root = `projects/${cfg.FIREBASE_PROJECT_ID}/databases/${cfg.FIRESTORE_DATABASE}`;
   const base = `https://firestore.googleapis.com/v1/${root}`;
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
@@ -159,6 +169,19 @@ async function firestore(env) {
   };
 }
 
+/** Đăng nhập tài khoản máy (Email/Password) của Firebase Auth → ID token dùng cho Firestore REST. */
+async function botToken(cfg) {
+  if (!cfg.BOT_EMAIL || !cfg.BOT_PASSWORD) throw new Error('Thiếu BOT_EMAIL / BOT_PASSWORD');
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${cfg.FIREBASE_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: cfg.BOT_EMAIL, password: cfg.BOT_PASSWORD, returnSecureToken: true }),
+  });
+  if (!res.ok) throw new Error(`Đăng nhập bot thất bại ${res.status}: ${await res.text()}`);
+  return (await res.json()).idToken;
+}
+
+/** (Tùy chọn) Dùng khóa tài khoản dịch vụ nếu bạn là chủ dự án Firebase. */
 async function accessToken(sa) {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
