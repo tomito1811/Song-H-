@@ -5,6 +5,7 @@ import { contrastRatio, isDark, safeId, lighten, darken, mix } from './artUtils'
 import { SongHyArt, LongPhungArt, BachSuArt, NhatBinhArt } from './motifsTraditional';
 import { MinimalArt, ThanhDiepArt, LienHoaArt, VuonKinhArt, HoaKhoArt, ChibiArt } from './motifsBotanical';
 import { BaroqueArt, SantoriniArt } from './motifsLuxury';
+import { EVENT_MOTIF_ART } from './motifsEvents';
 
 const SERIF = "'Playfair Display', Georgia, serif";
 const GARAMOND = "'Cormorant Garamond', Georgia, serif";
@@ -27,7 +28,23 @@ export const MOTIF_ART: Record<MotifId, React.FC<MotifProps>> = {
   'nhat-binh': NhatBinhArt,
   chibi: ChibiArt,
   'hoa-kho': HoaKhoArt,
+  ...EVENT_MOTIF_ART,
 };
+
+/** Bố cục chung cho thiệp sự kiện (1 tên chính + dòng phụ). */
+const ev = (o: Partial<MotifLayout> & { box: MotifLayout['box']; kicker: string }): MotifLayout => ({
+  kickerFont: ROUNDED,
+  nameFont: DANCING,
+  nameWeight: 700,
+  nameSize: 13,
+  ampFont: ROUNDED,
+  metaFont: ROUNDED,
+  nameColor: 'ink',
+  accentColor: 'metal',
+  divider: 'dots',
+  single: true,
+  ...o,
+});
 
 export const MOTIF_LAYOUT: Record<MotifId, MotifLayout> = {
   'song-hy': {
@@ -195,6 +212,16 @@ export const MOTIF_LAYOUT: Record<MotifId, MotifLayout> = {
     accentColor: 'ink',
     divider: 'dots',
   },
+  balloons: ev({ box: { top: 30, bottom: 16, left: 14, right: 14 }, kicker: 'Mời bạn dự tiệc sinh nhật' }),
+  cake: ev({ box: { top: 9, bottom: 42, left: 12, right: 12 }, kicker: 'Happy Birthday', nameColor: 'ink', divider: 'heart' }),
+  confetti: ev({ box: { top: 26, bottom: 22, left: 14, right: 14 }, kicker: 'Let’s celebrate', nameFont: SERIF, nameWeight: 700, nameSize: 10.5, divider: 'diamond' }),
+  house: ev({ box: { top: 8, bottom: 52, left: 14, right: 14 }, kicker: 'Mừng Tân Gia', nameFont: SERIF, nameWeight: 600, nameSize: 9.5, panel: 'none', gap: 1.6, divider: 'line' }),
+  'keys-plant': ev({ box: { top: 33, bottom: 14, left: 16, right: 16 }, kicker: 'Tiệc Tân Gia', nameFont: GARAMOND, nameWeight: 700, nameSize: 11, divider: 'leaf' }),
+  'baby-cloud': ev({ box: { top: 30, bottom: 22, left: 15, right: 15 }, kicker: 'Mừng bé đầy tháng', nameSize: 14, divider: 'dots' }),
+  'baby-bear': ev({ box: { top: 22, bottom: 30, left: 34, right: 10 }, kicker: 'Mừng bé thôi nôi', nameSize: 12.5, divider: 'heart' }),
+  'ribbon-cut': ev({ box: { top: 34, bottom: 18, left: 14, right: 14 }, kicker: 'Lễ Khai Trương', nameFont: GARAMOND, nameWeight: 700, nameSize: 10, nameCase: 'upper', nameColor: 'ink', divider: 'diamond' }),
+  firework: ev({ box: { top: 28, bottom: 18, left: 14, right: 14 }, kicker: 'Trân trọng kính mời', nameFont: SERIF, nameWeight: 700, nameSize: 9.6, nameColor: 'metal', accentColor: 'soft', divider: 'line' }),
+  'grad-cap': ev({ box: { top: 32, bottom: 25, left: 18, right: 18 }, kicker: 'Lễ Tốt Nghiệp', nameFont: GARAMOND, nameWeight: 700, nameSize: 10.5, divider: 'diamond' }),
 };
 
 export function resolveArtColors(m: TemplateMotif): ArtColors {
@@ -263,14 +290,17 @@ export const InvitationArtCard: React.FC<InvitationArtCardProps> = ({
   const L = MOTIF_LAYOUT[motif.id];
   if (!Art || !L) return null;
   const c = resolveArtColors(motif);
-  const pick = (k: 'ink' | 'metal' | 'text') => (k === 'ink' ? c.ink : k === 'metal' ? c.metal : c.text);
+  const pick = (k: 'ink' | 'metal' | 'text' | 'soft') =>
+    k === 'ink' ? c.ink : k === 'metal' ? c.metal : k === 'soft' ? c.soft : c.text;
   // Bảo đảm chữ luôn đủ tương phản (≥ 3:1 cho chữ lớn / nhãn in hoa) với nền thiệp.
   const nameColor = ensureContrast(pick(L.nameColor), c.ground, 3);
   const accent = ensureContrast(pick(L.accentColor), c.ground, 3);
 
-  const groom = groomName?.trim() || 'Tên Chú Rể';
-  const bride = brideName?.trim() || 'Tên Cô Dâu';
-  const longest = Math.max(groom.length, bride.length);
+  const single = Boolean(L.single);
+  const groom = groomName?.trim() || (single ? 'Tên Của Bạn' : 'Tên Chú Rể');
+  const bride = brideName?.trim() || (single ? '' : 'Tên Cô Dâu');
+  const kicker = motif.kicker || L.kicker;
+  const longest = single ? groom.length : Math.max(groom.length, bride.length);
   const fit = Math.min(1, 12 / Math.max(longest, 1));
   const nameSize = `${(L.nameSize * Math.max(fit, 0.62)).toFixed(2)}cqw`;
   const dp = dateParts(weddingDate);
@@ -329,7 +359,7 @@ export const InvitationArtCard: React.FC<InvitationArtCardProps> = ({
       style={{ aspectRatio: '3 / 4', containerType: 'inline-size', background: c.ground, ...style }}
       onClick={onClick}
       role="img"
-      aria-label={`Thiệp cưới ${groom} và ${bride}`}
+      aria-label={single ? `Thiệp mời ${kicker} ${groom}` : `Thiệp cưới ${groom} và ${bride}`}
     >
       <svg viewBox="0 0 600 800" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
         <Art c={c} uid={uid} variant={motif.variant} />
@@ -371,7 +401,7 @@ export const InvitationArtCard: React.FC<InvitationArtCardProps> = ({
             lineHeight: 1.35,
           }}
         >
-          {L.kicker}
+          {kicker}
         </p>
 
         <div style={{ lineHeight: 1.08 }}>
@@ -388,6 +418,14 @@ export const InvitationArtCard: React.FC<InvitationArtCardProps> = ({
           >
             {groom}
           </p>
+          {single ? (
+            bride && (
+              <p style={{ fontFamily: L.metaFont, fontSize: '3.4cqw', fontWeight: 600, color: accent, letterSpacing: '0.08em', marginTop: '1.2cqw' }}>
+                {bride}
+              </p>
+            )
+          ) : (
+          <>
           <p style={{ fontFamily: L.ampFont, fontSize: L.ampText && L.ampText.length > 2 ? '3cqw' : '7cqw', color: accent, lineHeight: 1.1, margin: '0.4cqw 0' }}>
             {L.ampText || '&'}
           </p>
@@ -404,6 +442,8 @@ export const InvitationArtCard: React.FC<InvitationArtCardProps> = ({
           >
             {bride}
           </p>
+          </>
+          )}
         </div>
 
         <Divider />
@@ -424,7 +464,7 @@ export const InvitationArtCard: React.FC<InvitationArtCardProps> = ({
               </p>
             </>
           ) : (
-            <p style={{ fontSize: '3.2cqw', fontWeight: 600 }}>Ngày cưới</p>
+            <p style={{ fontSize: '3.2cqw', fontWeight: 600 }}>{single ? 'Ngày diễn ra' : 'Ngày cưới'}</p>
           )}
           {lunarDate && <p style={{ fontSize: '2.6cqw', fontStyle: 'italic', opacity: 0.9 }}>{lunarDate}</p>}
         </div>

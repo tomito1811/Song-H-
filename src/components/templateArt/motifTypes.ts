@@ -25,7 +25,7 @@ export interface MotifLayout {
   ampText?: string;
   metaFont: string;
   nameColor: 'ink' | 'metal' | 'text';
-  accentColor: 'ink' | 'metal' | 'text';
+  accentColor: 'ink' | 'metal' | 'text' | 'soft';
   /** Nền mờ phía sau chữ (vd. thiệp có họa tiết dày). */
   panel?: 'none' | 'soft' | 'ground';
   monogram?: boolean;
@@ -34,4 +34,6 @@ export interface MotifLayout {
   /** Vùng riêng cho địa điểm (khi bố cục chính quá chật). */
   venueBox?: { top: number; bottom: number; left: number; right: number };
   divider?: 'line' | 'dots' | 'diamond' | 'leaf' | 'heart' | 'none';
+  /** Thiệp sự kiện: chỉ một tên chính + dòng phụ (không có "&"). */
+  single?: boolean;
 }
