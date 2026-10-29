@@ -50,6 +50,7 @@ import {
 import { upsertPreview, buildPreviewLink } from '../utils/engagement';
 import { MusicPicker } from './MusicPicker';
 import { eventConfig } from '../data/eventTypes';
+import { isSamplePhoto } from '../data/hotThemes';
 import { GalleryEffectPicker } from './GalleryEffectPicker';
 import { auth } from '../firebase';
 import { generateQrDataUrl } from '../utils/formatters';
@@ -527,7 +528,7 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
           ...prev,
           // Ảnh mẫu Unsplash mặc định được thay bằng ảnh thật của cặp đôi
           galleryImages: [
-            ...(prev.galleryImages || []).filter((u) => !u.includes('images.unsplash.com')),
+            ...(prev.galleryImages || []).filter((u) => !isSamplePhoto(u)),
             ...urls,
           ],
         }));

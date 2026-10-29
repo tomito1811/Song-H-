@@ -89,7 +89,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         {/* Brand header */}
         <div className="text-center">
           <img
-            src="/assets/aistudio/thiep-online_1c938423.png"
+            src={`${import.meta.env.BASE_URL}assets/logo.webp`} width={150} height={103} decoding="async"
             alt="Thiệp Online"
             className="h-12 w-auto mx-auto object-contain mb-3"
           />

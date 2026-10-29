@@ -33,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-3 group text-left cursor-pointer whitespace-nowrap shrink-0"
           >
             <img
-              src="/assets/aistudio/thiep-online_1c938423.png"
+              src={`${import.meta.env.BASE_URL}assets/logo.webp`} width={150} height={103} decoding="async"
               alt="Thiệp Online — THIEPONL"
               className="h-11 sm:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
             />

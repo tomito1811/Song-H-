@@ -14,7 +14,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className="space-y-4 md:col-span-1">
             <button onClick={() => onNavigate('home')} className="cursor-pointer block text-left">
               <img
-                src="/assets/aistudio/thiep-online_1c938423.png"
+                src={`${import.meta.env.BASE_URL}assets/logo.webp`} width={150} height={103} decoding="async"
                 alt="Thiệp Online — THIEPONL"
                 className="h-12 w-auto object-contain"
               />

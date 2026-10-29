@@ -49,6 +49,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Featured 4 curated templates
   const allPublished = WEDDING_TEMPLATES.filter(isPublishedTemplate);
   const publishedTemplates = allPublished.filter((t) => !t.eventType || t.eventType === 'wedding');
+  const hotTemplates = allPublished.filter((t) => t.hot);
   const eventGroups = EVENT_TYPES.filter((e) => e.id !== 'wedding').map((e) => ({
     ev: e,
     list: allPublished.filter((t) => t.eventType === e.id),
@@ -346,6 +347,52 @@ export const HomePage: React.FC<HomePageProps> = ({
         title="Dải Trưng Bày Mẫu Thiệp Độc Bản"
         subtitle="Công nghệ Soft Focus Infinite Ribbon tự động trôi ngang chậm rãi và lấy nét theo tâm, tôn vinh trọn vẹn từng đường nét nghệ thuật."
       />
+
+      {/* ========================================================= */}
+      {/* 2b. MẪU HOT: XEM THỬ NGAY                                   */}
+      {/* ========================================================= */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+          <div>
+            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-widest font-bold text-red-600 mb-1">
+              <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px]">HOT</span> Được chọn nhiều nhất
+            </span>
+            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-[#453C45] dark:text-[#F5EDE8]">Mẫu Thiệp Cưới HOT 2026</h2>
+            <p className="text-xs sm:text-sm text-[#827580] dark:text-[#B9A9B4] mt-1">
+              Giao diện website trọn bộ: ảnh cưới, nhạc nền, bản đồ, lịch trình, dress code, RSVP, lời chúc & hộp mừng.
+            </p>
+          </div>
+          <button onClick={() => onNavigate('templates')} className="text-xs font-bold text-[#C76A82] dark:text-[#E8B7C8] flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            Xem tất cả mẫu <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {hotTemplates.map((tpl) => (
+            <div key={tpl.id} className="group bg-white dark:bg-[#2A232A] rounded-3xl overflow-hidden border border-[#E8B7C8]/40 dark:border-[#3D333D] shadow-xs hover:shadow-xl transition-all">
+              <div className="relative aspect-[3/4]">
+                <TemplateThumb template={tpl} className="group-hover:scale-[1.03] transition-transform duration-700" />
+              </div>
+              <div className="p-3 sm:p-4">
+                <h3 className="font-heading text-sm sm:text-base font-bold text-[#453C45] dark:text-[#F5EDE8]">{tpl.name}</h3>
+                <p className="text-[11px] text-[#827580] dark:text-[#B9A9B4] line-clamp-2 mt-0.5">{tpl.description}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a
+                    href={`${import.meta.env.BASE_URL}demo/${tpl.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="py-2 rounded-xl border border-[#C76A82] text-[#C76A82] dark:text-[#E8B7C8] text-[11px] font-bold text-center"
+                  >
+                    Xem thử
+                  </a>
+                  <button onClick={() => onSelectTemplate(tpl)} className="py-2 rounded-xl bg-[#C76A82] text-white text-[11px] font-bold cursor-pointer">
+                    Dùng mẫu
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ========================================================= */}
       {/* 3. TUYỂN CHỌN MẪU NỔI BẬT THEO CHỦ ĐỀ                    */}

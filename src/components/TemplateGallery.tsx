@@ -301,7 +301,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
               <div className="relative aspect-[3/4] overflow-hidden bg-[#FAF4F0] dark:bg-[#201A20]">
                 <TemplateThumb template={tpl} className="group-hover:scale-105 transition-transform duration-700" />
 
-                {tpl.featured && isWedding && <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />}
+                {tpl.featured && isWedding && !tpl.hot && <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />}
 
                 {/* Status Badges */}
                 <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5">
@@ -430,7 +430,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                     </p>
                   </div>
 
-                  {typeOf(previewModalTemplate) === 'wedding' && <div>
+                  {typeOf(previewModalTemplate) === 'wedding' && !previewModalTemplate.hot && <div>
                     <span className="font-semibold text-[#453C45] dark:text-[#F5EDE8] block mb-1.5">
                       Album ảnh cưới trên thiệp (ảnh mẫu):
                     </span>

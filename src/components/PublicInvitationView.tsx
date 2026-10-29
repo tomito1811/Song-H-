@@ -29,6 +29,8 @@ import { SignaturePad } from './SignaturePad';
 import { fetchGuestForInvite, markGuestViewed, submitGift } from '../utils/engagement';
 import { findTrackByUrl } from '../data/music';
 import { eventConfig } from '../data/eventTypes';
+import { HOT_THEME_MAP } from '../data/hotThemes';
+import { HotInvitationView } from './HotInvitationView';
 
 interface PublicInvitationViewProps {
   invitation: WeddingInvitation;
@@ -270,6 +272,21 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
     venueName: invitation.venueName,
     venueAddress: invitation.venueAddress,
   };
+
+  // Mẫu HOT: giao diện trang dài riêng
+  const hotTheme = invitation.design.hotTheme ? HOT_THEME_MAP[invitation.design.hotTheme] : undefined;
+  if (hotTheme) {
+    return (
+      <HotInvitationView
+        invitation={invitation}
+        theme={hotTheme}
+        guest={guest}
+        noWrite={noWrite}
+        isPreviewMode={isPreviewMode}
+        sandboxLabel={sandboxLabel}
+      />
+    );
+  }
 
   return (
     <div
@@ -1157,7 +1174,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
               <span>Tạo bởi nền tảng thiệp online</span>
               <a href="/" className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity">
                 <img
-                  src="/assets/aistudio/thiep-online_1c938423.png"
+                  src={`${import.meta.env.BASE_URL}assets/logo.webp`} width={150} height={103} decoding="async"
                   alt="Thiệp Online"
                   className="h-6 w-auto object-contain"
                 />
