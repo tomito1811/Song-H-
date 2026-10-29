@@ -3,18 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { HomePage } from './components/HomePage';
 import { TemplateGallery } from './components/TemplateGallery';
-import { InvitationBuilder } from './components/InvitationBuilder';
-import { PublicInvitationView } from './components/PublicInvitationView';
-import { DashboardView } from './components/DashboardView';
-import { AdminView } from './components/AdminView';
+// Tải theo nhu cầu: các màn hình nặng chỉ tải khi người dùng mở tới (trang chủ nhẹ & nhanh hơn)
+const InvitationBuilder = lazy(() => import('./components/InvitationBuilder').then((m) => ({ default: m.InvitationBuilder })));
+const PublicInvitationView = lazy(() => import('./components/PublicInvitationView').then((m) => ({ default: m.PublicInvitationView })));
+const DashboardView = lazy(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
+const AdminView = lazy(() => import('./components/AdminView').then((m) => ({ default: m.AdminView })));
 import { AIDesignerModal } from './components/AIDesignerModal';
 import { AuthModal } from './components/AuthModal';
-import { LegalPages } from './components/LegalPages';
+const LegalPages = lazy(() => import('./components/LegalPages').then((m) => ({ default: m.LegalPages })));
 import { WeddingInvitation, WeddingTemplate, AIDesignProposal, User, EventType } from './types/wedding';
 import { WEDDING_TEMPLATES } from './data/templates';
 import { fetchInvitationBySlug, fetchInvitationById, createInvitation, getCurrentUser } from './utils/api';
@@ -285,6 +286,13 @@ export default function App() {
 
         {/* Main View Router */}
         <main className="flex-1">
+          <Suspense
+            fallback={
+              <div className="min-h-[60vh] flex items-center justify-center text-sm text-[#827580]">
+                <span className="w-6 h-6 mr-2 rounded-full border-2 border-[#C76A82] border-t-transparent animate-spin" /> Đang tải…
+              </div>
+            }
+          >
           {currentView === 'home' && (
             <HomePage
               onNavigate={navigateTo}
@@ -373,6 +381,7 @@ export default function App() {
               onNavigatePage={(p) => navigateTo(p)}
             />
           )}
+          </Suspense>
         </main>
 
         {/* Global Footer (Hidden in standalone public invitation and builder) */}
