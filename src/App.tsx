@@ -161,6 +161,26 @@ export default function App() {
 
   // Apply AI Generated Proposal (In-memory draft)
   const handleApplyAIProposal = (proposal: AIDesignProposal) => {
+    // Phương án gắn với mẫu thiệp thật → dựng thiệp từ mẫu, điền sẵn tên & lời mời
+    const tpl = proposal.templateId ? WEDDING_TEMPLATES.find((t) => t.id === proposal.templateId) : undefined;
+    if (tpl) {
+      const base = draftFromTemplate(tpl, currentUser?.id || auth.currentUser?.uid || '');
+      const g = proposal.groomName || '';
+      const b = proposal.brideName || '';
+      setActiveInvitation({
+        ...base,
+        groomName: g,
+        brideName: b,
+        title: g && b ? `Hôn Lễ ${g} & ${b}` : base.title,
+        invitationMessage: proposal.invitationMessage || base.invitationMessage,
+      });
+      setIsAIDesignerOpen(false);
+      setCurrentView('builder');
+      window.history.pushState({}, '', '/builder/new');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (!currentUser && !auth.currentUser) {
       setIsAIDesignerOpen(false);
       setIsAuthModalOpen(true);
@@ -236,9 +256,9 @@ export default function App() {
       ],
       giftBank: {
         enabled: false,
-        bankName: 'TPBank',
-        accountNumber: '87583868888',
-        accountHolder: 'TRAN MINH TIEN',
+        bankName: '',
+        accountNumber: '',
+        accountHolder: '',
         note: 'Mừng cưới',
       },
       viewsCount: 0,
