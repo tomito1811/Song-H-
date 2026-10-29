@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-[#FFFBF7]/90 dark:bg-[#1F1A1F]/90 backdrop-blur-md border-b border-[#E8B7C8]/25 dark:border-[#3D333D] transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 gap-4 sm:gap-8">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-6 min-w-0">
           {/* Zone 1: Wordmark & Logo */}
           <button
             onClick={() => onNavigate('home')}
@@ -37,12 +37,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img
               src={`${import.meta.env.BASE_URL}assets/logo.webp`} width={150} height={103} decoding="async"
               alt="Thiệp Online — THIEPONL"
-              className="h-11 sm:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+              className="h-10 sm:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
             />
           </button>
 
           {/* Zone 2: Navigation Links */}
-          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[#453C45] dark:text-[#F5EDE8]">
+          <nav className="hidden xl:flex items-center gap-6 text-sm font-medium text-[#453C45] dark:text-[#F5EDE8]">
             <button
               onClick={() => onNavigate('home')}
               className={`hover:text-[#C76A82] dark:hover:text-[#E8B7C8] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
@@ -104,16 +104,29 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Zone 3: Actions & Theme Toggle */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 min-w-0">
             {/* Desktop Theme Switcher */}
-            <ThemeToggle className="hidden sm:inline-block" />
+            <span className="hidden sm:inline-block">
+              <ThemeToggle />
+            </span>
 
-            <UpgradeProButton
-              user={currentUser}
-              size="sm"
-              className="hidden lg:inline-flex"
-              onClick={() => (currentUser ? requestUpgrade(onNavigate) : onOpenAuth && onOpenAuth())}
-            />
+            {/* Nút PRO: đầy đủ trên máy tính, gọn (biểu tượng vương miện) trên điện thoại */}
+            <span className="hidden sm:inline-flex">
+              <UpgradeProButton
+                user={currentUser}
+                size="sm"
+                onClick={() => (currentUser ? requestUpgrade(onNavigate) : onOpenAuth && onOpenAuth())}
+              />
+            </span>
+            <span className="inline-flex sm:hidden">
+              <UpgradeProButton
+                user={currentUser}
+                size="sm"
+                label="PRO"
+                className="!px-2.5 !py-1.5"
+                onClick={() => (currentUser ? requestUpgrade(onNavigate) : onOpenAuth && onOpenAuth())}
+              />
+            </span>
 
             {currentUser?.id && (
               <NotificationBell ownerId={currentUser.id} onOpenAll={() => onNavigate('dashboard')} />
@@ -175,7 +188,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => onNavigate('templates')}
-              className="px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-[#D4899C] to-[#C76A82] hover:from-[#C76A82] hover:to-[#B0596E] rounded-xl shadow-xs hover:shadow transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5"
+              className="hidden sm:flex px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#D4899C] to-[#C76A82] hover:from-[#C76A82] hover:to-[#B0596E] rounded-xl shadow-xs hover:shadow transition-all whitespace-nowrap shrink-0 cursor-pointer items-center gap-1.5"
             >
               <Heart className="w-3.5 h-3.5 fill-current" />
               <span>Tạo Thiệp Cưới</span>
@@ -184,7 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Mobile menu trigger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-[#453C45] dark:text-[#F5EDE8] hover:text-[#C76A82] dark:hover:text-[#E8B7C8] rounded-lg transition-colors cursor-pointer"
+              className="xl:hidden shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border border-[#E8B7C8]/40 dark:border-[#3D333D] text-[#453C45] dark:text-[#F5EDE8] hover:text-[#C76A82] dark:hover:text-[#E8B7C8] rounded-lg transition-colors cursor-pointer"
               aria-label="Mở danh mục điều hướng"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -195,7 +208,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-[#E8B7C8]/30 dark:border-[#3D333D] bg-[#FFFBF7] dark:bg-[#1F1A1F] px-4 pt-2 pb-6 space-y-3 transition-colors duration-200 shadow-xl">
+        <div className="xl:hidden max-h-[calc(100vh-4rem)] overflow-y-auto border-b border-[#E8B7C8]/30 dark:border-[#3D333D] bg-[#FFFBF7] dark:bg-[#1F1A1F] px-4 pt-2 pb-6 space-y-3 transition-colors duration-200 shadow-xl">
           {/* Mobile Theme Toggle Section */}
           <div className="pt-1 pb-2 border-b border-[#E8B7C8]/20 dark:border-[#3D333D]">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[#827580] dark:text-[#B9A9B4] mb-2 px-1">
@@ -205,6 +218,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="space-y-1">
+            <button
+              onClick={() => {
+                onNavigate('templates');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full mb-1 py-3 px-3 text-sm font-bold text-white bg-gradient-to-r from-[#D4899C] to-[#C76A82] rounded-xl flex items-center justify-center gap-2"
+            >
+              <Heart className="w-4 h-4 fill-current" /> Tạo Thiệp Cưới
+            </button>
             <button
               onClick={() => {
                 onNavigate('home');

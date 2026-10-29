@@ -240,9 +240,9 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
 
             {/* Lối tắt nổi bật: Mời khách & nâng cấp PRO */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-              <InviteGuestsButton size="lg" onClick={() => requestGuests(onNavigate)} />
-              <UpgradeProButton size="lg" label="Nâng cấp PRO · 299K" onClick={() => requestUpgrade(onNavigate)} />
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch justify-center lg:justify-start gap-3">
+              <InviteGuestsButton size="lg" className="w-full sm:w-auto justify-center !px-3 sm:!px-6" onClick={() => requestGuests(onNavigate)} />
+              <UpgradeProButton size="lg" label="PRO · 299K" className="w-full sm:w-auto justify-center !px-3 sm:!px-6" onClick={() => requestUpgrade(onNavigate)} />
             </div>
 
             {/* Quiet Editorial Trust Proof (Unboxed text with middot) */}
