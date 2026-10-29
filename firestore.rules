@@ -31,20 +31,26 @@ service cloud.firestore {
     // USERS
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) || isAdmin();
-      // Lượt miễn phí chỉ được ghi 1 lần, không được xóa để tạo lại
-      allow update: if isAdmin() || (isOwner(userId) && (
-        !('freeInvitationId' in resource.data) || resource.data.freeInvitationId == null ||
-        request.resource.data.freeInvitationId == resource.data.freeInvitationId
-      ));
+      // Tài khoản mới luôn bắt đầu ở gói free; gói trả phí chỉ do webhook SePay / Admin ghi
+      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.plan == 'free' && request.resource.data.role == 'user');
+      // Lượt miễn phí chỉ được ghi 1 lần; người dùng không tự đổi gói, hạn gói, quyền
+      allow update: if isAdmin() || (isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'planExpiresAt', 'role'])
+        && (!('freeInvitationId' in resource.data) || resource.data.freeInvitationId == null ||
+            request.resource.data.freeInvitationId == resource.data.freeInvitationId));
     }
 
     // INVITATIONS
     match /invitations/{invitationId} {
       allow get: if resource.data.status == 'published' || (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
       allow list: if (isSignedIn() && resource.data.userId == request.auth.uid) || resource.data.status == 'published' || isAdmin();
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.userId == request.auth.uid
+        && (!('isPaid' in request.resource.data) || request.resource.data.isPaid == false));
+      // Chủ thiệp không tự đánh dấu "đã thanh toán" (chỉ webhook SePay / Admin)
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPaid']));
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
 
       // GUESTS — ID khách là token bí mật trong link riêng (?g=...)
       match /guests/{guestId} {
@@ -98,8 +104,13 @@ service cloud.firestore {
     // ORDERS
     match /orders/{orderId} {
       allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      // Đơn mới luôn ở trạng thái chờ thanh toán
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending');
+      // Khách chỉ được hủy đơn của mình; xác nhận thanh toán do webhook SePay / Admin
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'cancelled');
     }
 
     // PAYMENTS
