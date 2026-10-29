@@ -404,10 +404,11 @@ export async function createInvitation(payload: Partial<WeddingInvitation>): Pro
       { id: 'time-3', time: '12:00', title: 'Khai Tiệc', description: 'Bữa tiệc mừng hạnh phúc cùng gia đình hai bên.' },
     ],
     giftBank: payload.giftBank ?? {
+      // Để trống: mỗi cặp đôi tự nhập tài khoản nhận quà của mình
       enabled: false,
-      bankName: 'TPBank',
-      accountNumber: '87583868888',
-      accountHolder: 'TRAN MINH TIEN',
+      bankName: '',
+      accountNumber: '',
+      accountHolder: '',
       note: 'Mừng cưới',
     },
     viewsCount: 0,
@@ -696,17 +697,38 @@ export async function generateAIDesign(payload: {
   stylePreference: string;
   tone?: string;
   notes?: string;
-}): Promise<{ isAIGenerated: boolean; proposals: AIDesignProposal[] }> {
-  const res = await fetch(`${BASE_URL}/api/ai/design`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  return {
-    isAIGenerated: data.isAIGenerated || false,
-    proposals: data.proposals || [],
-  };
+}, variation = 0): Promise<{ isAIGenerated: boolean; proposals: AIDesignProposal[] }> {
+  const { generateLocalProposals } = await import('./smartDesigner');
+  const local = generateLocalProposals(payload, variation);
+  // Trên GitHub Pages không có máy chủ /api → dùng trợ lý thiết kế chạy trên trình duyệt.
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`${BASE_URL}/api/ai/design`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const isJson = (res.headers.get('content-type') || '').includes('application/json');
+    if (res.ok && isJson) {
+      const data = await res.json();
+      if (data.isAIGenerated && Array.isArray(data.proposals) && data.proposals.length) {
+        // Gắn mẫu thiệp thật cho phương án AI để áp dụng ra thiệp đẹp ngay
+        const proposals = data.proposals.map((p: AIDesignProposal, i: number) => ({
+          ...p,
+          templateId: p.templateId || local[i % local.length]?.templateId,
+          groomName: payload.groomName,
+          brideName: payload.brideName,
+        }));
+        return { isAIGenerated: true, proposals };
+      }
+    }
+  } catch {
+    /* không có máy chủ AI — dùng bản chạy trên trình duyệt */
+  }
+  return { isAIGenerated: false, proposals: local };
 }
 
 export async function fetchPricingPlans(): Promise<PricingPlan[]> {
@@ -777,12 +799,14 @@ export async function createOrder(
   }
   const referenceCode = `TOP${refSuffix}`;
 
-  const bankName = 'TPBank';
-  const accountNumber = '87583868888';
-  const accountHolder = 'TRAN MINH TIEN';
+  const { SEPAY_BANK } = await import('../data/paymentConfig');
+  const bankName = SEPAY_BANK.bankName;
+  const accountNumber = SEPAY_BANK.accountNumber;
+  const accountHolder = SEPAY_BANK.accountHolder;
   const amount = plan.price;
   const encodedDes = encodeURIComponent(referenceCode);
-  const vietQrUrl = `https://vietqr.app/img?acc=${accountNumber}&bank=${bankName}&amount=${amount}&des=${encodedDes}`;
+  // Mã QR động của SePay: quét là điền sẵn số tiền & nội dung (mã đơn) → SePay tự xác nhận
+  const vietQrUrl = `https://qr.sepay.vn/img?acc=${accountNumber}&bank=${encodeURIComponent(bankName)}&amount=${amount}&des=${encodedDes}&template=compact`;
 
   const order: Order = {
     id: orderId,
