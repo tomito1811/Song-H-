@@ -8,10 +8,11 @@ import { HOT_THEME_MAP } from '../data/hotThemes';
  * Ảnh đại diện mẫu thiệp: dùng ảnh thumbnail nếu có, nếu không (mẫu sự kiện vẽ bằng SVG)
  * thì hiển thị trực tiếp tấm thiệp minh họa với dữ liệu mẫu.
  */
-export const TemplateThumb: React.FC<{ template: WeddingTemplate; className?: string; large?: boolean }> = ({
+export const TemplateThumb: React.FC<{ template: WeddingTemplate; className?: string; large?: boolean; names?: [string, string] }> = ({
   template,
   className = '',
   large,
+  names,
 }) => {
   const src = large ? template.preview || template.thumbnail : template.thumbnail;
   const hot = template.design.hotTheme ? HOT_THEME_MAP[template.design.hotTheme] : undefined;
@@ -22,7 +23,7 @@ export const TemplateThumb: React.FC<{ template: WeddingTemplate; className?: st
         <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, ${hot.c.deep}f0 100%)` }} />
         <div className="absolute inset-x-0 bottom-0 p-4 text-center" style={{ color: hot.c.onDeep }}>
           <p className="text-2xl leading-tight" style={{ fontFamily: hot.script, fontWeight: 700 }}>
-            Hải Nam <span style={{ fontFamily: hot.serif }}>&</span> Khánh Linh
+            {names?.[0] || 'Hải Nam'} <span style={{ fontFamily: hot.serif }}>&</span> {names?.[1] || 'Khánh Linh'}
           </p>
           <p className="text-[10px] uppercase tracking-[0.3em] mt-1">{hot.kicker}</p>
         </div>

@@ -374,8 +374,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <span>Cần hỗ trợ? (Lỡ chuyển sai nội dung / số tiền)</span>
           </button>
 
-          {/* Dev Test Hook: Allows Admin / Dev to simulate payment directly for testing */}
-          <button
+          {/* Chỉ Admin thấy nút kiểm thử — khách hàng không thể tự kích hoạt gói */}
+          {isAdmin && <button
             type="button"
             disabled={isSimulating}
             onClick={handleSimulateWebhook}
@@ -386,7 +386,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <span>
               {isSimulating ? 'Đang kích hoạt…' : '🧪 Giả lập Webhook SePay Thành Công'}
             </span>
-          </button>
+          </button>}
         </div>
 
         {/* Support Modal Popup */}

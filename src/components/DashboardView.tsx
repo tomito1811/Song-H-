@@ -1291,7 +1291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {/* Dynamic VietQR */}
                 <div className="w-56 sm:w-64 mx-auto p-2 bg-[#FFFBF7] rounded-2xl border border-neutral-300 shadow-sm flex flex-col items-center justify-center">
                   <img
-                    src={`https://vietqr.app/img?acc=87583868888&bank=TPBank&amount=${createdOrder.amount}&des=${createdOrder.bankReference}`}
+                    src={bankAccountInfo?.vietQrUrl || `https://qr.sepay.vn/img?acc=87583868888&bank=TPBank&amount=${createdOrder.amount}&des=${createdOrder.bankReference}&template=compact`}
                     alt={`VietQR TPBank ${createdOrder.bankReference}`}
                     className="w-full h-auto max-h-68 object-contain rounded-xl"
                   />

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Sparkles, Heart, Check, X, RefreshCw, ArrowRight, Wand2, Palette } from 'lucide-react';
 import { AIDesignProposal, WeddingTemplate } from '../types/wedding';
 import { generateAIDesign } from '../utils/api';
+import { WEDDING_TEMPLATES } from '../data/templates';
+import { TemplateThumb } from './TemplateThumb';
 
 interface AIDesignerModalProps {
   isOpen: boolean;
@@ -23,6 +25,7 @@ export const AIDesignerModal: React.FC<AIDesignerModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [proposals, setProposals] = useState<AIDesignProposal[]>([]);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
+  const [variation, setVariation] = useState(0);
 
   if (!isOpen) return null;
 
@@ -38,7 +41,8 @@ export const AIDesignerModal: React.FC<AIDesignerModalProps> = ({
         stylePreference,
         tone,
         notes,
-      });
+      }, variation);
+      setVariation((v) => v + 1);
       setProposals(res.proposals);
       setIsAIGenerated(res.isAIGenerated);
     } catch (err) {
@@ -137,6 +141,19 @@ export const AIDesignerModal: React.FC<AIDesignerModalProps> = ({
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-[#453C45] mb-1">
+                Ghi chú về tiệc cưới (tùy chọn)
+              </label>
+              <input
+                type="text"
+                placeholder="Ví dụ: Tiệc tối bên bãi biển, tiệc sân vườn, lễ ăn hỏi truyền thống..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/50"
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -145,7 +162,7 @@ export const AIDesignerModal: React.FC<AIDesignerModalProps> = ({
               {loading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>AI đang phác thảo 3 phương án thiết kế...</span>
+                  <span>Đang phác thảo 3 phương án thiết kế...</span>
                 </>
               ) : (
                 <>
@@ -161,8 +178,8 @@ export const AIDesignerModal: React.FC<AIDesignerModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#827580]">
                 {isAIGenerated
-                  ? '✨ Được tạo theo thời gian thực bởi mô hình Gemini 3.8 Flash'
-                  : '🌿 Tạo bởi bộ chuẩn thiết kế cao cấp Pastel Luxury'}
+                  ? '✨ Được tạo theo thời gian thực bởi Gemini AI'
+                  : `🌿 Gợi ý thông minh từ ${WEDDING_TEMPLATES.length}+ mẫu thiệp theo phong cách & tông giọng của bạn`}
               </span>
               <button
                 onClick={() => setProposals([])}
@@ -180,6 +197,14 @@ export const AIDesignerModal: React.FC<AIDesignerModalProps> = ({
                   style={{ backgroundColor: prop.palette?.background || '#FFFBF7' }}
                 >
                   <div className="space-y-3">
+                    {(() => {
+                      const tpl = prop.templateId ? WEDDING_TEMPLATES.find((t) => t.id === prop.templateId) : undefined;
+                      return tpl ? (
+                        <div className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-md -mx-1">
+                          <TemplateThumb template={tpl} names={[groomName, brideName]} />
+                        </div>
+                      ) : null;
+                    })()}
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#C76A82] px-2 py-0.5 rounded-full bg-[#F6DCE5]/60">
                         Phương án 0{idx + 1}
