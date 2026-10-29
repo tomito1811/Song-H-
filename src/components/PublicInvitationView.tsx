@@ -28,6 +28,7 @@ import { GallerySlideshow, defaultEffectForTemplate } from './GallerySlideshow';
 import { SignaturePad } from './SignaturePad';
 import { fetchGuestForInvite, markGuestViewed, submitGift } from '../utils/engagement';
 import { findTrackByUrl } from '../data/music';
+import { eventConfig } from '../data/eventTypes';
 
 interface PublicInvitationViewProps {
   invitation: WeddingInvitation;
@@ -48,6 +49,11 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
 }) => {
   // Không ghi dữ liệu thật khi xem trước trong trình soạn, bản xem trước QR, hoặc mẫu demo
   const noWrite = isPreviewMode || Boolean(sandboxLabel);
+  const ev = eventConfig(invitation.eventType);
+  const isWedding = !invitation.eventType || invitation.eventType === 'wedding';
+  const displayNames = isWedding
+    ? `${invitation.groomName} & ${invitation.brideName}`
+    : invitation.groomName;
   const [isOpened, setIsOpened] = useState(isPreviewMode);
   const [guest, setGuest] = useState<Guest | null>(null);
   const [wishSignature, setWishSignature] = useState<string | null>(null);
@@ -240,7 +246,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
       setGiftSuccess(true);
     } catch (err) {
       console.error(err);
-      alert('Không gửi được xác nhận mừng cưới. Vui lòng thử lại!');
+      alert('Không gửi được xác nhận gửi quà. Vui lòng thử lại!');
     } finally {
       setGiftLoading(false);
     }
@@ -330,7 +336,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 type="button"
                 onClick={handleOpenEnvelope}
                 className="group block w-full max-w-[380px] mx-auto cursor-pointer text-center focus-visible:outline-2 focus-visible:outline-offset-4"
-                aria-label="Mở thiệp cưới"
+                aria-label={ev.openCta}
               >
                 <InvitationArtCard
                   motif={motif}
@@ -343,7 +349,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   </span>
                 )}
                 <span className="mt-5 text-xs font-semibold uppercase tracking-wider block" style={{ color: palette.primary }}>
-                  Chạm để mở thiệp cưới
+                  {ev.openCta}
                 </span>
                 <ChevronDown className="w-4 h-4 mx-auto mt-1 animate-bounce" style={{ color: palette.primary }} />
               </button>
@@ -352,10 +358,10 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
             {/* Romantic Pre-Text */}
             <div className="mb-8">
               <span className="font-script text-3xl sm:text-4xl text-[#C76A82] block mb-2">
-                Wedding Invitation
+                {ev.headline}
               </span>
               <h1 className="font-heading text-3xl sm:text-4xl font-bold text-[#453C45] tracking-tight">
-                {invitation.groomName} & {invitation.brideName}
+                {displayNames}
               </h1>
               <p className="text-sm text-[#827580] mt-2 tracking-widest uppercase">
                 {formatDateVN(invitation.weddingDate)}
@@ -401,7 +407,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
               {/* Click instruction */}
               <div className="text-center mt-2">
                 <span className="text-xs font-semibold text-[#453C45] uppercase tracking-wider block group-hover:text-[#C76A82] transition-colors">
-                  Chạm để mở thiệp cưới
+                  {ev.openCta}
                 </span>
                 <ChevronDown className="w-4 h-4 mx-auto mt-1 text-[#C76A82] animate-bounce" />
               </div>
@@ -428,7 +434,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
           {/* Top Floating Mini Bar */}
           <div className="sticky top-0 z-30 bg-white/85 backdrop-blur-sm border-b border-[#E8B7C8]/25 px-4 py-2.5 flex items-center justify-between text-xs text-[#827580]">
             <span className="font-heading font-semibold text-[#453C45]">
-              {invitation.groomName} & {invitation.brideName}
+              {displayNames}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -456,7 +462,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
               <div className="relative z-10 space-y-4">
                 {!motif && (
                   <span className="text-xs uppercase tracking-widest text-[#827580] font-semibold block">
-                    Lễ Thành Hôn
+                    {isWedding ? 'Lễ Thành Hôn' : ev.headline}
                   </span>
                 )}
 
@@ -471,7 +477,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                       <div className="relative mx-auto mt-6 w-full max-w-sm rounded-2xl overflow-hidden shadow-xl border-4 border-white aspect-[3/4]">
                         <img
                           src={invitation.coverImage}
-                          alt="Cô dâu và chú rể"
+                          alt="Ảnh bìa thiệp"
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
@@ -496,7 +502,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 <div className="relative mx-auto mt-6 w-full max-w-sm rounded-2xl overflow-hidden shadow-xl border-4 border-white aspect-[3/4]">
                   <img
                     src={invitation.coverImage || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80'}
-                    alt="Cô dâu và chú rể"
+                    alt="Ảnh bìa thiệp"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -625,7 +631,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 className="text-2xl font-bold mb-6"
                 style={{ fontFamily: invitation.design.fontHeading, color: palette.primary }}
               >
-                Tiệc Cưới Thân Mật
+                {ev.eventInfoTitle}
               </h2>
 
               <div className="max-w-md mx-auto bg-white rounded-2xl p-6 shadow-md border border-[#E8B7C8]/30 space-y-5">
@@ -724,7 +730,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
             >
               <div className="text-center mb-8">
                 <span className="text-xs uppercase tracking-widest text-[#827580] font-medium block mb-2">
-                  Chương Trình Hôn Lễ
+                  {ev.programTitle}
                 </span>
                 <h2
                   className="text-2xl font-bold"
@@ -770,7 +776,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 className="text-2xl font-bold mb-8"
                 style={{ fontFamily: invitation.design.fontHeading, color: palette.primary }}
               >
-                Album Ảnh Cưới
+                {ev.albumTitle}
               </h2>
 
               <GallerySlideshow
@@ -799,7 +805,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   Gửi Lời Xác Nhận (RSVP)
                 </h2>
                 <p className="text-xs text-[#827580] mt-2 max-w-sm mx-auto">
-                  Để buổi tiệc được chuẩn bị chu đáo nhất, quý khách vui lòng xác nhận trước ngày cưới.
+                  {ev.rsvpNote}
                 </p>
               </div>
 
@@ -812,7 +818,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                   <p className="text-xs text-[#827580] leading-relaxed">
                     {guest && guest.rsvpStatus !== 'pending' && !rsvpData.message
                       ? `${guest.name} đã ${guest.rsvpStatus === 'attending' ? 'xác nhận tham dự' : 'báo vắng mặt'}. Cảm ơn bạn đã phản hồi!`
-                      : 'Cảm ơn bạn đã phản hồi. Sự hiện diện của bạn là niềm hạnh phúc to lớn đối với cô dâu chú rể.'}
+                      : `Cảm ơn bạn đã phản hồi. Sự hiện diện của bạn là niềm hạnh phúc to lớn đối với ${ev.hostsRef}.`}
                   </p>
                 </div>
               ) : (
@@ -919,7 +925,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                     </label>
                     <textarea
                       rows={2}
-                      placeholder="Gửi lời chúc mừng đến cô dâu và chú rể..."
+                      placeholder={ev.wishPlaceholder}
                       value={rsvpData.message}
                       onChange={(e) => setRsvpData({ ...rsvpData, message: e.target.value })}
                       className="w-full px-3.5 py-2 text-sm rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/50 resize-none"
@@ -977,7 +983,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 <textarea
                   required
                   rows={3}
-                  placeholder="Viết lời chúc ngọt ngào nhất gửi đến cô dâu chú rể..."
+                  placeholder={ev.wishPlaceholder}
                   value={wishData.message}
                   onChange={(e) => setWishData({ ...wishData, message: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/40 resize-none"
@@ -1043,7 +1049,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
             >
               <Gift className="w-8 h-8 mx-auto text-[#C76A82] mb-2 animate-bounce" />
               <span className="text-xs uppercase tracking-widest text-[#827580] font-medium block mb-1">
-                Hộp Mừng Cưới
+                {ev.giftTitle}
               </span>
               <h2
                 className="text-2xl font-bold mb-3"
@@ -1052,7 +1058,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 Gửi Quà Mừng Yêu Thương
               </h2>
               <p className="text-xs text-[#827580] max-w-sm mx-auto mb-6 leading-relaxed">
-                Nếu không thể đến dự tiệc trực tiếp, quý khách có thể gửi quà mừng qua tài khoản ngân hàng dưới đây.
+                {ev.giftNote}
               </p>
 
               <div className="max-w-xs mx-auto bg-white p-6 rounded-2xl shadow-md border border-[#E8B7C8]/30 text-center space-y-4">
@@ -1088,11 +1094,11 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
                 {giftSuccess ? (
                   <div className="bg-white p-4 rounded-2xl border border-[#607B64]/30 text-xs text-[#453C45] flex items-center gap-2 justify-center">
                     <CheckCircle className="w-4 h-4 text-[#607B64]" />
-                    Cô dâu chú rể đã nhận được xác nhận mừng cưới của bạn. Xin cảm ơn!
+                    {isWedding ? 'Cô dâu chú rể đã nhận được xác nhận mừng cưới của bạn. Xin cảm ơn!' : `Đã gửi xác nhận quà mừng đến ${ev.hostsRef}. Xin cảm ơn!`}
                   </div>
                 ) : (
                   <form onSubmit={handleGiftSubmit} className="bg-white p-4 rounded-2xl border border-[#E8B7C8]/30 shadow-sm space-y-2 text-left">
-                    <p className="text-xs font-semibold text-[#453C45] text-center">Đã gửi quà mừng? Báo cho cô dâu chú rể nhé</p>
+                    <p className="text-xs font-semibold text-[#453C45] text-center">Đã gửi quà mừng? Báo cho {ev.hostsRef} nhé</p>
                     <input
                       type="text"
                       required
@@ -1148,7 +1154,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
               </p>
             )}
             <div className="mt-8 pt-6 border-t border-[#E8B7C8]/20 flex items-center justify-center gap-2 text-xs text-[#827580]">
-              <span>Tạo bởi nền tảng thiệp cưới</span>
+              <span>Tạo bởi nền tảng thiệp online</span>
               <a href="/" className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity">
                 <img
                   src="/assets/aistudio/thiep-online_1c938423.png"
@@ -1175,7 +1181,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
           </button>
           <img
             src={lightboxImg}
-            alt="Ảnh cưới phóng to"
+            alt="Ảnh phóng to"
             className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
           />
         </div>
@@ -1187,7 +1193,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
               <h3 className="font-heading font-bold text-base text-[#453C45]">
-                Mã QR Thiệp Cưới
+                Mã QR Thiệp Mời
               </h3>
               <button
                 onClick={() => setQrModalOpen(false)}
@@ -1203,7 +1209,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
 
             {qrDataUrl && (
               <div className="w-56 h-56 mx-auto p-2 bg-[#FFFBF7] rounded-xl border border-[#E8B7C8]/40 shadow-inner flex items-center justify-center">
-                <img src={qrDataUrl} alt="Mã QR Thiệp Cưới" className="w-full h-full object-contain" />
+                <img src={qrDataUrl} alt="Mã QR thiệp mời" className="w-full h-full object-contain" />
               </div>
             )}
 

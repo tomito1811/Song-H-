@@ -49,6 +49,7 @@ import {
 } from '../utils/api';
 import { upsertPreview, buildPreviewLink } from '../utils/engagement';
 import { MusicPicker } from './MusicPicker';
+import { eventConfig } from '../data/eventTypes';
 import { GalleryEffectPicker } from './GalleryEffectPicker';
 import { auth } from '../firebase';
 import { generateQrDataUrl } from '../utils/formatters';
@@ -74,6 +75,8 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
   onNavigate,
 }) => {
   const [invitation, setInvitation] = useState<WeddingInvitation>(initialInvitation);
+  const ev = eventConfig(invitation.eventType);
+  const isWedding = !invitation.eventType || invitation.eventType === 'wedding';
   const [history, setHistory] = useState<WeddingInvitation[]>([initialInvitation]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
@@ -234,7 +237,7 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
   const handleCompleteWorkflow = async () => {
     // 1. Mandatory Fields Validation
     if (!invitation.groomName || !invitation.groomName.trim()) {
-      setSaveToast('Vui lòng nhập tên Chú Rể trước khi hoàn thành');
+      setSaveToast(`Vui lòng nhập ${ev.nameLabel.toLowerCase()} trước khi hoàn thành`);
       setActiveTab('info');
       setTimeout(() => {
         const el = document.getElementById('input-groom-name');
@@ -242,7 +245,7 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
       }, 100);
       return;
     }
-    if (!invitation.brideName || !invitation.brideName.trim()) {
+    if (isWedding && (!invitation.brideName || !invitation.brideName.trim())) {
       setSaveToast('Vui lòng nhập tên Cô Dâu trước khi hoàn thành');
       setActiveTab('info');
       setTimeout(() => {
@@ -940,12 +943,12 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-[#453C45] mb-1">
-                      Tên Chú Rể <span className="text-red-500">*</span>
+                      {isWedding ? 'Tên Chú Rể' : ev.nameLabel} <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="input-groom-name"
                       type="text"
-                      placeholder="Ví dụ: Quốc Bảo"
+                      placeholder={isWedding ? 'Ví dụ: Quốc Bảo' : `Ví dụ: ${ev.namePlaceholder}`}
                       value={invitation.groomName || ''}
                       onChange={(e) => updateState((prev) => ({ ...prev, groomName: e.target.value }))}
                       className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/50"
@@ -953,12 +956,12 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#453C45] mb-1">
-                      Tên Cô Dâu <span className="text-red-500">*</span>
+                      {isWedding ? 'Tên Cô Dâu' : ev.subtitleLabel} {isWedding && <span className="text-red-500">*</span>}
                     </label>
                     <input
                       id="input-bride-name"
                       type="text"
-                      placeholder="Ví dụ: Minh Anh"
+                      placeholder={isWedding ? 'Ví dụ: Minh Anh' : `Ví dụ: ${ev.subtitlePlaceholder}`}
                       value={invitation.brideName || ''}
                       onChange={(e) => updateState((prev) => ({ ...prev, brideName: e.target.value }))}
                       className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/50"
@@ -969,11 +972,11 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                 {/* Title */}
                 <div>
                   <label className="block text-xs font-semibold text-[#453C45] mb-1">
-                    Tiêu Đề Thiệp Cưới
+                    {isWedding ? 'Tiêu Đề Thiệp Cưới' : 'Tiêu Đề Thiệp'}
                   </label>
                   <input
                     type="text"
-                    placeholder="Ví dụ: Hôn Lễ Quốc Bảo & Minh Anh"
+                    placeholder={isWedding ? 'Ví dụ: Hôn Lễ Quốc Bảo & Minh Anh' : `Ví dụ: ${ev.eventInfoTitle} ${ev.namePlaceholder}`}
                     value={invitation.title || ''}
                     onChange={(e) => updateState((prev) => ({ ...prev, title: e.target.value }))}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#C76A82]/50"
@@ -985,7 +988,7 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="block text-xs font-bold text-[#453C45]">
-                        Ảnh Bìa Cưới (Cover Image)
+                        {isWedding ? 'Ảnh Bìa Cưới (Cover Image)' : 'Ảnh Bìa (Cover Image)'}
                       </label>
                       <span className="text-[11px] text-[#827580]">
                         Tự động nén tối đa 1600px & tải lên Firebase Storage

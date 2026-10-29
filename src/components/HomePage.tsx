@@ -29,6 +29,8 @@ import { PRICING_PLANS } from '../data/pricing';
 import { formatVND } from '../utils/formatters';
 import { SoftFocusRibbon } from './SoftFocusRibbon';
 import { SampleAlbumStack } from './SampleAlbumStack';
+import { TemplateThumb } from './TemplateThumb';
+import { EVENT_TYPES } from '../data/eventTypes';
 
 interface HomePageProps {
   onNavigate: (view: string, params?: any) => void;
@@ -45,7 +47,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [previewModalTemplate, setPreviewModalTemplate] = useState<WeddingTemplate | null>(null);
 
   // Featured 4 curated templates
-  const publishedTemplates = WEDDING_TEMPLATES.filter(isPublishedTemplate);
+  const allPublished = WEDDING_TEMPLATES.filter(isPublishedTemplate);
+  const publishedTemplates = allPublished.filter((t) => !t.eventType || t.eventType === 'wedding');
+  const eventGroups = EVENT_TYPES.filter((e) => e.id !== 'wedding').map((e) => ({
+    ev: e,
+    list: allPublished.filter((t) => t.eventType === e.id),
+  }));
   // 4 mẫu tiêu biểu thuộc 4 chủ đề khác nhau (ưu tiên mẫu featured của bộ sưu tập mới).
   const featuredTemplates = (() => {
     const picked: WeddingTemplate[] = [];
@@ -407,6 +414,56 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 3b. DANH MỤC LOẠI THIỆP: SINH NHẬT, TÂN GIA, ĐẦY THÁNG...   */}
+      {/* ========================================================= */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="text-center max-w-xl mx-auto mb-10">
+          <span className="text-xs uppercase tracking-widest text-[#C76A82] dark:text-[#E8B7C8] font-semibold block mb-1">
+            Không Chỉ Thiệp Cưới
+          </span>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold text-[#453C45] dark:text-[#F5EDE8]">
+            Thiệp Mời Online Cho Mọi Dịp Vui
+          </h2>
+          <p className="text-xs sm:text-sm text-[#827580] dark:text-[#B9A9B4] mt-2">
+            Sinh nhật, tân gia, đầy tháng, khai trương, tốt nghiệp — đầy đủ link riêng, QR, xác nhận tham dự & sổ lưu bút.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          {eventGroups.map(({ ev, list }) => (
+            <button
+              key={ev.id}
+              type="button"
+              onClick={() => onNavigate('templates', { type: ev.id })}
+              className="group text-left bg-white dark:bg-[#2A232A] rounded-3xl border border-[#E8B7C8]/40 dark:border-[#3D333D] shadow-xs hover:shadow-xl transition-all p-4 cursor-pointer flex flex-col"
+            >
+              <div className="relative h-44 mb-4">
+                {list.slice(0, 3).map((tpl, k) => (
+                  <div
+                    key={tpl.id}
+                    className="absolute top-0 w-[46%] aspect-[3/4] rounded-xl overflow-hidden shadow-lg border-2 border-white dark:border-[#2A232A] transition-transform duration-500"
+                    style={{
+                      left: `${[27, 2, 52][k]}%`,
+                      zIndex: k === 0 ? 3 : 1,
+                      transform: `rotate(${[0, -8, 8][k]}deg) translateY(${k === 0 ? 0 : 10}px)`,
+                    }}
+                  >
+                    <TemplateThumb template={tpl} />
+                  </div>
+                ))}
+              </div>
+              <h3 className="font-heading text-base font-bold text-[#453C45] dark:text-[#F5EDE8] group-hover:text-[#C76A82] flex items-center gap-1.5">
+                <span aria-hidden>{ev.emoji}</span> {ev.label}
+              </h3>
+              <p className="text-[11px] text-[#827580] dark:text-[#B9A9B4] mt-1 line-clamp-2 flex-1">{ev.description}</p>
+              <span className="mt-3 text-xs font-semibold text-[#C76A82] dark:text-[#E8B7C8] flex items-center gap-1">
+                Xem {list.length} mẫu <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </button>
           ))}
         </div>
       </section>

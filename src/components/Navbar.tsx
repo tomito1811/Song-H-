@@ -55,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 currentView === 'templates' ? 'text-[#C76A82] dark:text-[#E8B7C8] font-semibold' : ''
               }`}
             >
-              Mẫu Thiệp Cưới
+              Mẫu Thiệp
             </button>
             <button
               onClick={() => onOpenAIDesigner && onOpenAIDesigner()}
@@ -192,7 +192,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               className="w-full text-left py-2.5 px-3 text-sm font-medium text-[#453C45] dark:text-[#F5EDE8] hover:bg-[#F6DCE5]/40 dark:hover:bg-[#2A232A] rounded-lg transition-colors"
             >
-              Mẫu Thiệp Cưới
+              Mẫu Thiệp
             </button>
             <button
               onClick={() => {

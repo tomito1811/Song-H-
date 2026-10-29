@@ -2,13 +2,17 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { generateQrDataUrl } from '../utils/formatters';
 import { buildDemoLink } from '../utils/engagement';
 import { SampleAlbumStack } from './SampleAlbumStack';
+import { TemplateThumb } from './TemplateThumb';
+import { EVENT_TYPES, eventConfig } from '../data/eventTypes';
+import { EventType } from '../types/wedding';
 import { sampleAlbumFor } from '../data/sampleAlbum';
 import { Search, Sparkles, Filter, Check, Eye, Heart, ArrowRight, X } from 'lucide-react';
 import { WeddingTemplate, TemplateCategory } from '../types/wedding';
 import { WEDDING_TEMPLATES } from '../data/templates';
 import { TemplateFilterBar, filterTemplates, isPublishedTemplate, CollectionFilter, ColorFilter, templateSwatches } from './TemplateFilterBar';
 
-const PUBLISHED = WEDDING_TEMPLATES.filter(isPublishedTemplate);
+const ALL_PUBLISHED = WEDDING_TEMPLATES.filter(isPublishedTemplate);
+const typeOf = (t: WeddingTemplate): EventType => t.eventType || 'wedding';
 
 /** QR mở trang demo của mẫu thiệp trên điện thoại. */
 const DemoQr: React.FC<{ template: WeddingTemplate }> = ({ template }) => {
@@ -38,12 +42,39 @@ const DemoQr: React.FC<{ template: WeddingTemplate }> = ({ template }) => {
 interface TemplateGalleryProps {
   onSelectTemplate: (template: WeddingTemplate) => void;
   onOpenAIDesigner?: () => void;
+  initialEventType?: EventType;
 }
 
 export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   onSelectTemplate,
   onOpenAIDesigner,
+  initialEventType,
 }) => {
+  const [eventType, setEventTypeState] = useState<EventType>(() => {
+    if (initialEventType) return initialEventType;
+    try {
+      const q = new URLSearchParams(window.location.search).get('type') as EventType | null;
+      if (q && EVENT_TYPES.some((e) => e.id === q)) return q;
+    } catch {
+      /* ignore */
+    }
+    return 'wedding';
+  });
+  const PUBLISHED = useMemo(() => ALL_PUBLISHED.filter((t) => typeOf(t) === eventType), [eventType]);
+  const ev = eventConfig(eventType);
+  const isWedding = eventType === 'wedding';
+  const setEventType = (t: EventType) => {
+    setEventTypeState(t);
+    setSelectedCategory('all');
+    setCollectionFilter('all');
+    setColorFilter('all');
+    setSearchQuery('');
+    try {
+      window.history.replaceState({}, '', t === 'wedding' ? '/templates' : `/templates?type=${t}`);
+    } catch {
+      /* ignore */
+    }
+  };
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [tierFilter, setTierFilter] = useState<'all' | 'free' | 'premium'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,7 +118,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
       }
       return true;
     });
-  }, [selectedCategory, tierFilter, searchQuery, collectionFilter, colorFilter]);
+  }, [PUBLISHED, selectedCategory, tierFilter, searchQuery, collectionFilter, colorFilter]);
 
   return (
     <div className="py-10 md:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto transition-colors duration-200">
@@ -96,10 +127,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#C76A82] dark:text-[#E8B7C8] mb-2">
           <span>Bộ Sưu Tập Mẫu Thiệp 2026</span>
           <span aria-hidden="true">·</span>
-          <span>{PUBLISHED.length} Thiết Kế</span>
+          <span>{ALL_PUBLISHED.length} Thiết Kế</span>
         </div>
         <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-[#453C45] dark:text-[#F5EDE8] tracking-tight mb-4">
-          Thư Viện Mẫu Thiệp Cưới Sang Trọng
+          {isWedding ? 'Thư Viện Mẫu Thiệp Cưới Sang Trọng' : `Mẫu ${ev.label} Online`}
         </h1>
         <p className="text-sm sm:text-base text-[#827580] dark:text-[#B9A9B4] leading-relaxed max-w-2xl mx-auto font-light">
           Tất cả mẫu thiệp được chế tác theo phong cách <strong>Pastel Luxury & Korean Minimal</strong>, tối ưu hoá tương thích 100% trên thiết bị di động.
@@ -132,15 +163,40 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         )}
       </div>
 
+      {/* Danh mục loại thiệp */}
+      <div className="mb-8 -mx-1 flex gap-2 overflow-x-auto pb-2 px-1" role="tablist" aria-label="Loại thiệp">
+        {EVENT_TYPES.map((e) => {
+          const count = ALL_PUBLISHED.filter((t) => typeOf(t) === e.id).length;
+          const on = e.id === eventType;
+          return (
+            <button
+              key={e.id}
+              role="tab"
+              aria-selected={on}
+              onClick={() => setEventType(e.id)}
+              className={`shrink-0 px-4 py-2.5 rounded-2xl border text-xs sm:text-sm font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                on
+                  ? 'bg-[#C76A82] text-white border-[#C76A82] shadow-sm'
+                  : 'bg-white dark:bg-[#2A232A] text-[#453C45] dark:text-[#F5EDE8] border-[#E8B7C8]/40 dark:border-[#3D333D] hover:border-[#C76A82]'
+              }`}
+            >
+              <span aria-hidden>{e.emoji}</span>
+              {e.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${on ? 'bg-white/25' : 'bg-[#F6DCE5]/60 dark:bg-[#3D333D]'}`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Search & Filters */}
       <div className="space-y-4 mb-10">
-        <TemplateFilterBar
+        {isWedding && <TemplateFilterBar
           templates={PUBLISHED}
           collection={collectionFilter}
           color={colorFilter}
           onCollectionChange={setCollectionFilter}
           onColorChange={setColorFilter}
-        />
+        />}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Search Input */}
           <div className="relative w-full md:w-80">
@@ -198,7 +254,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         </div>
 
         {/* Category Horizontal Filter Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        <div className={`${isWedding ? 'flex' : 'hidden'} items-center gap-2 overflow-x-auto pb-2 scrollbar-none`}>
           {categories.map((cat) => (
             <button
               key={cat.id}
@@ -243,16 +299,9 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             >
               {/* Card Image Container */}
               <div className="relative aspect-[3/4] overflow-hidden bg-[#FAF4F0] dark:bg-[#201A20]">
-                <img
-                  src={tpl.thumbnail}
-                  alt={tpl.name}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  referrerPolicy="no-referrer"
-                />
+                <TemplateThumb template={tpl} className="group-hover:scale-105 transition-transform duration-700" />
 
-                {tpl.featured && <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />}
+                {tpl.featured && isWedding && <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />}
 
                 {/* Status Badges */}
                 <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5">
@@ -330,12 +379,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
           <div className="bg-white dark:bg-[#2A232A] rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl border border-[#E8B7C8]/40 dark:border-[#3D333D] flex flex-col md:flex-row max-h-[90vh]">
             {/* Modal Image */}
             <div className="w-full md:w-1/2 aspect-[3/4] bg-[#FAF4F0] dark:bg-[#201A20] relative">
-              <img
-                src={previewModalTemplate.preview}
-                alt={previewModalTemplate.name}
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+              <TemplateThumb template={previewModalTemplate} large />
               <div className="absolute top-3.5 left-3.5">
                 <span className="px-2.5 py-1 rounded-md text-xs font-bold text-white bg-black/60 backdrop-blur-xs">
                   {previewModalTemplate.style}
@@ -386,7 +430,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                     </p>
                   </div>
 
-                  <div>
+                  {typeOf(previewModalTemplate) === 'wedding' && <div>
                     <span className="font-semibold text-[#453C45] dark:text-[#F5EDE8] block mb-1.5">
                       Album ảnh cưới trên thiệp (ảnh mẫu):
                     </span>
@@ -395,7 +439,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                         <img key={src} src={src} alt="" loading="lazy" className="w-16 h-24 object-cover rounded-lg border border-[#E8B7C8]/40 shrink-0" />
                       ))}
                     </div>
-                  </div>
+                  </div>}
 
                   <DemoQr template={previewModalTemplate} />
                 </div>
