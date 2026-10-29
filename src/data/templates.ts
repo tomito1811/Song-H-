@@ -1,5 +1,6 @@
 import { WeddingTemplate } from '../types/wedding';
 import { PREMIUM_COLLECTION } from './premiumTemplates';
+import { EVENT_TEMPLATES } from './eventTemplates';
 
 // Các mẫu gốc (giữ nguyên, không chỉnh sửa).
 const LEGACY_TEMPLATES: WeddingTemplate[] = [
@@ -911,4 +912,7 @@ const LEGACY_TEMPLATES: WeddingTemplate[] = [
  * Toàn bộ thư viện mẫu: mẫu gốc + bộ sưu tập cao cấp (chỉ các mẫu đã xuất bản).
  * Bộ sưu tập mới được đặt lên đầu để hiển thị nổi bật.
  */
-export const WEDDING_TEMPLATES: WeddingTemplate[] = [...PREMIUM_COLLECTION, ...LEGACY_TEMPLATES];
+export const WEDDING_TEMPLATES: WeddingTemplate[] = [...PREMIUM_COLLECTION, ...LEGACY_TEMPLATES, ...EVENT_TEMPLATES];
+
+/** Chỉ thiệp cưới (không gồm thiệp sự kiện). */
+export const ONLY_WEDDING_TEMPLATES: WeddingTemplate[] = WEDDING_TEMPLATES.filter((t) => !t.eventType || t.eventType === 'wedding');
