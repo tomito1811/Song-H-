@@ -39,6 +39,8 @@ export interface DesignConfig {
   musicTitle?: string;
   /** Hiệu ứng trình chiếu album ảnh. Không đặt → tự chọn theo mẫu thiệp. */
   galleryEffect?: GalleryEffect;
+  /** Giao diện thiệp HOT dạng trang dài (xem data/hotThemes.ts). */
+  hotTheme?: 'rose' | 'ivory' | 'lavender' | 'rustic' | 'starry' | 'blush' | 'ruby-film' | 'ocean';
   /**
    * Thiết kế minh họa gốc (bộ sưu tập cao cấp). Khi có giá trị, thiệp hiển thị
    * bằng InvitationArtCard (SVG + chữ HTML) thay cho ảnh bìa mặc định.
@@ -150,6 +152,8 @@ export interface WeddingTemplate {
   featured?: boolean;
   /** Loại thiệp (mặc định: thiệp cưới). */
   eventType?: EventType;
+  /** Mẫu HOT: luôn đứng đầu thư viện. */
+  hot?: boolean;
 }
 
 export interface LoveStoryItem {
