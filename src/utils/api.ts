@@ -334,6 +334,7 @@ export async function createInvitation(payload: Partial<WeddingInvitation>): Pro
         : 'Thiệp Cưới',
     status: payload.status || 'draft',
     templateId: payload.templateId || 'tpl-pastel-01',
+    ...(payload.eventType && payload.eventType !== 'wedding' ? { eventType: payload.eventType } : {}),
     brideName: payload.brideName ?? '',
     groomName: payload.groomName ?? '',
     brideTitle: payload.brideTitle ?? 'Cô Dâu',
