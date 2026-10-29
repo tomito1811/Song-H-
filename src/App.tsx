@@ -15,7 +15,7 @@ import { AdminView } from './components/AdminView';
 import { AIDesignerModal } from './components/AIDesignerModal';
 import { AuthModal } from './components/AuthModal';
 import { LegalPages } from './components/LegalPages';
-import { WeddingInvitation, WeddingTemplate, AIDesignProposal, User } from './types/wedding';
+import { WeddingInvitation, WeddingTemplate, AIDesignProposal, User, EventType } from './types/wedding';
 import { WEDDING_TEMPLATES } from './data/templates';
 import { fetchInvitationBySlug, fetchInvitationById, createInvitation, getCurrentUser } from './utils/api';
 import { auth, onAuthStateChanged } from './firebase';
@@ -32,6 +32,7 @@ export default function App() {
   const [publicGuestId, setPublicGuestId] = useState<string | undefined>(undefined);
   const [sandboxLabel, setSandboxLabel] = useState<string | undefined>(undefined);
   const [publicNotFound, setPublicNotFound] = useState(false);
+  const [templateType, setTemplateType] = useState<EventType | undefined>(undefined);
 
   const [isAIDesignerOpen, setIsAIDesignerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -128,7 +129,9 @@ export default function App() {
     if (view === 'home') {
       window.history.pushState({}, '', '/');
     } else if (view === 'templates') {
-      window.history.pushState({}, '', '/templates');
+      const t: EventType | undefined = params?.type;
+      setTemplateType(t || 'wedding');
+      window.history.pushState({}, '', t && t !== 'wedding' ? `/templates?type=${t}` : '/templates');
     } else if (view === 'dashboard') {
       window.history.pushState({}, '', '/dashboard');
     } else if (view === 'admin') {
@@ -292,6 +295,8 @@ export default function App() {
 
           {currentView === 'templates' && (
             <TemplateGallery
+              key={templateType || 'init'}
+              initialEventType={templateType}
               onSelectTemplate={handleSelectTemplate}
               onOpenAIDesigner={() => setIsAIDesignerOpen(true)}
             />
