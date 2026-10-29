@@ -16,11 +16,22 @@
  * Nội dung chuyển khoản chứa mã đơn TOPxxxxxx do web tạo.
  */
 
-const PLAN_DAYS = 365;
+// Thời hạn gói: PRO 15 ngày, LUXURY 3 tháng. Gia hạn cộng dồn vào hạn còn lại.
+const PLAN_DAYS = { premium: 15, luxury: 90 };
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET', 'Cache-Control': 'no-store' };
+    if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
+    // Mã băm IP người dùng (không lộ IP thật) — dùng giới hạn 1 thiệp miễn phí / mạng
+    if (request.method === 'GET' && url.pathname === '/ip') {
+      const ip = request.headers.get('CF-Connecting-IP') || '';
+      const salt = env.SEPAY_API_KEY || 'thieponl';
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}|${ip}`));
+      const ipHash = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+      return new Response(JSON.stringify({ ipHash }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
     if (request.method === 'GET') {
       return json({ ok: true, service: 'sepay-webhook', path: url.pathname });
     }
@@ -73,7 +84,15 @@ async function handleTransaction(tx, env) {
 
   const txId = String(tx.id || tx.referenceCode || `${code}-${Date.now()}`);
   const now = new Date().toISOString();
-  const expires = new Date(Date.now() + PLAN_DAYS * 86400000).toISOString();
+  const days = PLAN_DAYS[o.planId] || 15;
+  let base = Date.now();
+  if (o.userId) {
+    const u = await fs.get(`users/${o.userId}`);
+    if (u && u.plan === o.planId && u.planExpiresAt && new Date(u.planExpiresAt).getTime() > base) {
+      base = new Date(u.planExpiresAt).getTime();
+    }
+  }
+  const expires = new Date(base + days * 86400000).toISOString();
 
   // 3. Ghi nguyên tử: payment (chống xử lý trùng), order → paid, user → gói mới, thiệp → xuất bản
   const writes = [
@@ -131,6 +150,13 @@ async function firestore(env) {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   return {
+    async get(path) {
+      const res = await fetch(`${base}/documents/${path}`, { headers });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      const d = await res.json();
+      return decodeFields(d.fields || {});
+    },
     async query(collection, field, value) {
       const res = await fetch(`${base}/documents:runQuery`, {
         method: 'POST',
