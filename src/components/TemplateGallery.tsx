@@ -305,9 +305,15 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
                 {/* Status Badges */}
                 <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5">
-                  <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/95 dark:bg-[#1F1A1F]/90 text-[#453C45] dark:text-[#F5EDE8] shadow-xs backdrop-blur-xs">
-                    {tpl.isPremium ? 'Mẫu Premium' : 'Mẫu Miễn Phí'}
-                  </span>
+                  {tpl.isPremium ? (
+                    <span className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wider text-white shadow" style={{ background: 'linear-gradient(135deg,#E8546F,#C76A82,#D4A73C)' }}>
+                      👑 PRO
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/95 dark:bg-[#1F1A1F]/90 text-[#453C45] dark:text-[#F5EDE8] shadow-xs backdrop-blur-xs">
+                      Miễn Phí
+                    </span>
+                  )}
                 </div>
 
                 {/* Color preview dots */}

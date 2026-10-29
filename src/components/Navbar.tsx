@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles, Menu, X, Heart, ShieldCheck, User, LogOut } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { effectivePlan, PLAN_LABEL } from '../data/planRules';
+import { UpgradeProButton, requestUpgrade, requestGuests } from './ProPromo';
 import { auth, fbSignOut } from '../firebase';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -81,6 +82,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Quản Lý Thiệp
             </button>
+            {currentUser && (
+              <button
+                onClick={() => requestGuests(onNavigate)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#2F7D5B] text-white font-bold text-xs shadow hover:bg-[#256A4C] whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5" /> Mời Khách
+              </button>
+            )}
             {currentUser?.role === 'admin' && (
               <button
                 onClick={() => onNavigate('admin')}
@@ -98,6 +107,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Desktop Theme Switcher */}
             <ThemeToggle className="hidden sm:inline-block" />
+
+            <UpgradeProButton
+              user={currentUser}
+              size="sm"
+              className="hidden lg:inline-flex"
+              onClick={() => (currentUser ? requestUpgrade(onNavigate) : onOpenAuth && onOpenAuth())}
+            />
 
             {currentUser?.id && (
               <NotificationBell ownerId={currentUser.id} onOpenAll={() => onNavigate('dashboard')} />
@@ -235,6 +251,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Quản Lý Thiệp Cưới Của Tôi
             </button>
+            {currentUser && (
+              <button
+                onClick={() => {
+                  requestGuests(onNavigate);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left py-2.5 px-3 text-sm font-bold text-white bg-[#2F7D5B] rounded-lg flex items-center gap-2"
+              >
+                <User className="w-4 h-4" /> Mời Khách
+              </button>
+            )}
+            <div className="pt-1">
+              <UpgradeProButton
+                user={currentUser}
+                className="w-full justify-center"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  currentUser ? requestUpgrade(onNavigate) : onOpenAuth && onOpenAuth();
+                }}
+              />
+            </div>
             {currentUser?.role === 'admin' && (
               <button
                 onClick={() => {

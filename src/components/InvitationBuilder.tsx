@@ -51,6 +51,7 @@ import { upsertPreview, buildPreviewLink } from '../utils/engagement';
 import { MusicPicker } from './MusicPicker';
 import { eventConfig } from '../data/eventTypes';
 import { isSamplePhoto } from '../data/hotThemes';
+import { UpgradeProButton, requestUpgrade } from './ProPromo';
 import { GalleryEffectPicker } from './GalleryEffectPicker';
 import { auth } from '../firebase';
 import { generateQrDataUrl } from '../utils/formatters';
@@ -749,6 +750,13 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
               {saveStatus === 'saving' ? 'Đang lưu…' : 'Lưu thiệp'}
             </span>
           </button>
+
+          <UpgradeProButton
+            user={currentUser}
+            size="sm"
+            className="hidden sm:inline-flex"
+            onClick={() => (currentUser ? requestUpgrade(onNavigate) : onRequireAuth && onRequireAuth())}
+          />
 
           {/* Hoàn Thành Button */}
           <button
@@ -1909,8 +1917,9 @@ export const InvitationBuilder: React.FC<InvitationBuilderProps> = ({
         invitation={invitation}
         onManageGuests={() => {
           setPublishedSuccessModalOpen(false);
-          if (onNavigateBack) onNavigateBack();
-          else if (onNavigate) onNavigate('dashboard');
+          if (onNavigate) onNavigate('dashboard', { tab: 'guests' });
+          else if (onNavigateBack) onNavigateBack();
+          setTimeout(() => window.dispatchEvent(new Event('thieponl:open-guests')), 80);
         }}
         onContinueEditing={() => setPublishedSuccessModalOpen(false)}
       />

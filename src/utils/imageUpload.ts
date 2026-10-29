@@ -1,5 +1,29 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
+import { auth } from '../firebase';
+
+/**
+ * Ảnh & nhạc được lưu trên Cloudflare (Worker + KV, miễn phí) vì dự án Firebase chưa bật Storage.
+ * Worker xác thực người tải bằng phiên đăng nhập Gmail (Firebase ID token).
+ */
+const MEDIA_WORKER = 'https://songhy-sepay.contact-media-vnn.workers.dev';
+
+async function uploadBlob(blob: Blob, contentType: string, ext: string): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Vui lòng đăng nhập Gmail để tải ảnh lên.');
+  const token = await user.getIdToken();
+  const res = await fetch(`${MEDIA_WORKER}/upload?ext=${ext}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
+    body: blob,
+  });
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    /* ignore */
+  }
+  if (!res.ok || !data.url) throw new Error(data.message || `Tải lên thất bại (mã ${res.status}).`);
+  return data.url as string;
+}
 
 /**
  * Compresses an image file on client side using HTML5 Canvas
@@ -84,28 +108,9 @@ export async function uploadImageToStorage(
     // 1. Compress image to max 1600px
     const compressedBlob = await compressImage(file, 1600, 0.85);
 
-    // 2. Generate unique storage path
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const sanitizedName = file.name
-      .toLowerCase()
-      .replace(/[^a-z0-9.]/g, '-')
-      .replace(/-+/g, '-');
-    const storagePath = `${folder}/${timestamp}_${randomSuffix}_${sanitizedName}.jpg`;
-
-    // 3. Upload to Firebase Storage
-    const storageRef = ref(storage, storagePath);
-    const metadata = {
-      contentType: 'image/jpeg',
-      customMetadata: {
-        originalName: file.name,
-        uploadedAt: new Date().toISOString(),
-      },
-    };
-
-    const uploadResult = await uploadBytes(storageRef, compressedBlob, metadata);
-    const downloadUrl = await getDownloadURL(uploadResult.ref);
-    return downloadUrl;
+    // 2. Tải lên kho ảnh Cloudflare
+    void folder;
+    return await uploadBlob(compressedBlob, 'image/jpeg', 'jpg');
   } catch (err: any) {
     console.error('Firebase Storage upload error:', err);
     throw new Error(err.message || 'Lỗi khi tải ảnh lên máy chủ Firebase Storage.');
@@ -192,13 +197,8 @@ export async function uploadImagesBatch(
       try {
         const { blob, ext } = await compressImageFast(file);
         progress.savedBytes += Math.max(0, file.size - blob.size);
-        const base = file.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 40);
-        const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${base || 'anh'}.${ext}`;
-        const res = await uploadBytes(ref(storage, path), blob, {
-          contentType: ext === 'webp' ? 'image/webp' : 'image/jpeg',
-          cacheControl: 'public,max-age=31536000',
-        });
-        results[index] = await getDownloadURL(res.ref);
+        void folder;
+        results[index] = await uploadBlob(blob, ext === 'webp' ? 'image/webp' : 'image/jpeg', ext);
       } catch (err: any) {
         progress.failed++;
         errors.push(`${file.name}: ${err?.message || 'lỗi tải lên'}`);
@@ -216,9 +216,8 @@ export async function uploadImagesBatch(
 /** Tải file nhạc MP3/M4A (tối đa 15MB) lên Firebase Storage. */
 export async function uploadAudioToStorage(file: File, folder = 'music'): Promise<string> {
   if (!file.type.startsWith('audio/')) throw new Error('Vui lòng chọn file nhạc (MP3, M4A...).');
-  if (file.size > 15 * 1024 * 1024) throw new Error('File nhạc tối đa 15MB.');
-  const base = file.name.toLowerCase().replace(/[^a-z0-9.]/g, '-').replace(/-+/g, '-');
-  const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${base}`;
-  const res = await uploadBytes(ref(storage, path), file, { contentType: file.type });
-  return getDownloadURL(res.ref);
+  if (file.size > 10 * 1024 * 1024) throw new Error('File nhạc tối đa 10MB.');
+  void folder;
+  const ext = (file.name.split('.').pop() || 'mp3').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'mp3';
+  return uploadBlob(file, file.type || 'audio/mpeg', ext);
 }

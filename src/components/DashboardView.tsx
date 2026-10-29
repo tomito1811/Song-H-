@@ -37,6 +37,7 @@ import {
 } from '../utils/engagement';
 import { fetchRsvps, fetchWishes } from '../utils/api';
 import { WishAlbum } from './WishAlbum';
+import { ProBanner, InviteGuestsButton, UpgradeProButton, OPEN_UPGRADE, OPEN_GUESTS } from './ProPromo';
 import { FREE_GUEST_LIMIT, isPlanActive, daysLeft, PLAN_LABEL, effectivePlan } from '../data/planRules';
 import { InvitationArtCard } from './templateArt/InvitationArtCard';
 import {
@@ -137,6 +138,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [currentUser.id]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Mở bảng nâng cấp / tab Mời Khách khi được gọi từ menu, banner, nút ở nơi khác
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get('upgrade')) {
+        setUpgradeModalOpen(true);
+        setCreatedOrder(null);
+      }
+    } catch {
+      /* ignore */
+    }
+    const up = () => {
+      setUpgradeModalOpen(true);
+      setCreatedOrder(null);
+    };
+    const gs = () => setActiveTab('guests');
+    window.addEventListener(OPEN_UPGRADE, up);
+    window.addEventListener(OPEN_GUESTS, gs);
+    return () => {
+      window.removeEventListener(OPEN_UPGRADE, up);
+      window.removeEventListener(OPEN_GUESTS, gs);
+    };
+  }, []);
+
+  const openGuestsFor = (invId: string) => {
+    handleSelectInvForGuests(invId);
+    setActiveTab('guests');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -403,18 +433,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <button
+          <InviteGuestsButton onClick={() => setActiveTab('guests')} />
+          <UpgradeProButton
+            user={currentUser}
             onClick={() => {
               setUpgradeModalOpen(true);
               setCreatedOrder(null);
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#B6925B] text-[#B6925B] bg-[#FCFBF7] hover:bg-[#F8F4EC] transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            {isPlanActive(currentUser) && currentUser.role !== 'admin'
-              ? `${PLAN_LABEL[effectivePlan(currentUser)]} · còn ${daysLeft(currentUser.planExpiresAt)} ngày — Gia hạn`
-              : 'Nâng Cấp Gói PRO'}
-          </button>
+          />
           <button
             onClick={onNavigateToTemplates}
             className="px-4 py-2 text-xs font-bold text-white bg-[#C76A82] hover:bg-[#B0596E] rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -424,6 +450,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      <ProBanner
+        user={currentUser}
+        onUpgrade={() => {
+          setUpgradeModalOpen(true);
+          setCreatedOrder(null);
+        }}
+      />
 
       {/* KPI Overview Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -476,7 +510,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            Quản Lý Khách Mời & RSVP
+            <span className={activeTab === 'guests' ? '' : 'text-[#2F7D5B] font-extrabold'}>Mời Khách</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-[#2F7D5B] text-white text-[10px]">{guests.length}</span>
           </button>
           <button
             onClick={() => setActiveTab('wishes')}
@@ -640,6 +675,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
 
                   {/* Actions Footer */}
+                  <div className="px-4 pt-1 pb-0">
+                    <InviteGuestsButton size="md" className="w-full justify-center" onClick={() => openGuestsFor(inv.id)} />
+                  </div>
                   <div className="p-4 border-t border-neutral-100 flex items-center justify-between gap-2">
                     <button
                       onClick={() => onEditInvitation(inv)}

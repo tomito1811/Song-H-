@@ -187,10 +187,10 @@ export const PublishedSuccessModal: React.FC<PublishedSuccessModalProps> = ({
               onClose();
               onManageGuests();
             }}
-            className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-[#607B64] hover:bg-[#47634C] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+            className="w-full sm:flex-1 py-3.5 px-4 rounded-xl bg-[#2F7D5B] hover:bg-[#256A4C] text-white text-sm sm:text-base font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-[#2F7D5B]/30 transition-colors cursor-pointer animate-pulse"
           >
-            <Users className="w-4 h-4" />
-            <span>Quản Lý Khách Mời & RSVP</span>
+            <Users className="w-5 h-5" />
+            <span>Mời Khách Ngay — gửi link & QR riêng</span>
           </button>
           <button
             onClick={() => {

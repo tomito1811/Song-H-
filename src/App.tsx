@@ -134,7 +134,8 @@ export default function App() {
       setTemplateType(t || 'wedding');
       window.history.pushState({}, '', t && t !== 'wedding' ? `/templates?type=${t}` : '/templates');
     } else if (view === 'dashboard') {
-      window.history.pushState({}, '', '/dashboard');
+      const q = params?.upgrade ? '?upgrade=1' : params?.tab ? `?tab=${params.tab}` : '';
+      window.history.pushState({}, '', `/dashboard${q}`);
     } else if (view === 'admin') {
       window.history.pushState({}, '', '/admin');
     } else if (view === 'terms' || view === 'privacy' || view === 'refund') {
@@ -335,7 +336,7 @@ export default function App() {
               initialInvitation={activeInvitation}
               currentUser={currentUser}
               onRequireAuth={() => setIsAuthModalOpen(true)}
-              onNavigate={(view) => navigateTo(view)}
+              onNavigate={(view, params) => navigateTo(view, params)}
               onSaveSuccess={(saved) => setActiveInvitation(saved)}
               onOpenAIDesigner={() => setIsAIDesignerOpen(true)}
               onNavigateBack={() => navigateTo('dashboard')}

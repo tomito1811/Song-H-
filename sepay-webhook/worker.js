@@ -22,8 +22,17 @@ const PLAN_DAYS = { premium: 15, luxury: 90 };
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET', 'Cache-Control': 'no-store' };
-    if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
+    const cors = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+      'Cache-Control': 'no-store',
+    };
+    if (request.method === 'OPTIONS') return new Response(null, { headers: { ...cors, 'Access-Control-Max-Age': '86400' } });
+
+    // ===== Kho ảnh/nhạc (Cloudflare KV, binding tên MEDIA) =====
+    if (request.method === 'POST' && url.pathname === '/upload') return handleUpload(request, env, url, cors);
+    if (request.method === 'GET' && url.pathname.startsWith('/m/')) return serveMedia(env, url.pathname.slice(3), cors);
     // Mã băm IP người dùng (không lộ IP thật) — dùng giới hạn 1 thiệp miễn phí / mạng
     if (request.method === 'GET' && url.pathname === '/ip') {
       const ip = request.headers.get('CF-Connecting-IP') || '';
@@ -61,6 +70,54 @@ export default {
     }
   },
 };
+
+const MAX_IMAGE = 3 * 1024 * 1024;
+const MAX_AUDIO = 10 * 1024 * 1024;
+
+async function handleUpload(request, env, url, cors) {
+  const out = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+  if (!env.MEDIA) return out({ message: 'Kho ảnh chưa được cấu hình (thiếu KV binding MEDIA).' }, 503);
+
+  // Xác thực người tải bằng Firebase ID token
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token) return out({ message: 'Vui lòng đăng nhập để tải ảnh.' }, 401);
+  const apiKey = env.FIREBASE_API_KEY || DEFAULTS.FIREBASE_API_KEY;
+  const look = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken: token }),
+  });
+  if (!look.ok) return out({ message: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại.' }, 401);
+  const uid = ((await look.json()).users || [])[0]?.localId;
+  if (!uid) return out({ message: 'Không xác thực được tài khoản.' }, 401);
+
+  const type = (request.headers.get('Content-Type') || '').split(';')[0].trim();
+  const isImg = /^image\/(jpeg|png|webp|gif)$/.test(type);
+  const isAudio = /^audio\//.test(type);
+  if (!isImg && !isAudio) return out({ message: 'Chỉ nhận ảnh (JPG/PNG/WebP) hoặc nhạc.' }, 415);
+  const buf = await request.arrayBuffer();
+  if (!buf.byteLength) return out({ message: 'File trống.' }, 400);
+  if (buf.byteLength > (isImg ? MAX_IMAGE : MAX_AUDIO)) return out({ message: isImg ? 'Ảnh tối đa 3MB.' : 'Nhạc tối đa 10MB.' }, 413);
+
+  const ext = (url.searchParams.get('ext') || (isImg ? 'webp' : 'mp3')).replace(/[^a-z0-9]/gi, '').slice(0, 5);
+  const rand = Array.from(crypto.getRandomValues(new Uint8Array(6))).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const key = `${uid}/${Date.now()}-${rand}.${ext}`;
+  await env.MEDIA.put(key, buf, { metadata: { type, uid, size: buf.byteLength } });
+  return out({ url: `${url.origin}/m/${key}`, key });
+}
+
+async function serveMedia(env, key, cors) {
+  if (!env.MEDIA || !key) return new Response('Not found', { status: 404, headers: cors });
+  const { value, metadata } = await env.MEDIA.getWithMetadata(decodeURIComponent(key), { type: 'arrayBuffer', cacheTtl: 86400 });
+  if (!value) return new Response('Not found', { status: 404, headers: cors });
+  return new Response(value, {
+    headers: {
+      ...cors,
+      'Content-Type': (metadata && metadata.type) || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  });
+}
 
 async function handleTransaction(tx, env) {
   const amount = Number(tx.transferAmount || tx.amount || 0);

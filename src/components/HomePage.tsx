@@ -30,6 +30,7 @@ import { formatVND } from '../utils/formatters';
 import { SoftFocusRibbon } from './SoftFocusRibbon';
 import { SampleAlbumStack } from './SampleAlbumStack';
 import { TemplateThumb } from './TemplateThumb';
+import { UpgradeProButton, requestUpgrade, requestGuests, InviteGuestsButton } from './ProPromo';
 import { EVENT_TYPES } from '../data/eventTypes';
 
 interface HomePageProps {
@@ -238,6 +239,12 @@ export const HomePage: React.FC<HomePageProps> = ({
               </button>
             </div>
 
+            {/* Lối tắt nổi bật: Mời khách & nâng cấp PRO */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+              <InviteGuestsButton size="lg" onClick={() => requestGuests(onNavigate)} />
+              <UpgradeProButton size="lg" label="Nâng cấp PRO · 299K" onClick={() => requestUpgrade(onNavigate)} />
+            </div>
+
             {/* Quiet Editorial Trust Proof (Unboxed text with middot) */}
             <div className="pt-6 border-t border-[#E8B7C8]/25 dark:border-[#3D333D] flex flex-wrap items-center justify-center lg:justify-start gap-y-2 gap-x-4 text-xs text-[#827580] dark:text-[#B9A9B4]">
               <span className="flex items-center gap-1.5">
@@ -362,9 +369,12 @@ export const HomePage: React.FC<HomePageProps> = ({
               Giao diện website trọn bộ: ảnh cưới, nhạc nền, bản đồ, lịch trình, dress code, RSVP, lời chúc & hộp mừng.
             </p>
           </div>
-          <button onClick={() => onNavigate('templates')} className="text-xs font-bold text-[#C76A82] dark:text-[#E8B7C8] flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
-            Xem tất cả mẫu <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <UpgradeProButton size="sm" label="Mở khóa mẫu HOT · PRO" onClick={() => requestUpgrade(onNavigate)} />
+            <button onClick={() => onNavigate('templates')} className="text-xs font-bold text-[#C76A82] dark:text-[#E8B7C8] flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+              Xem tất cả mẫu <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {hotTemplates.map((tpl) => (
@@ -433,9 +443,15 @@ export const HomePage: React.FC<HomePageProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute top-3 left-3">
-                  <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/95 dark:bg-[#1F1A1F]/90 text-[#453C45] dark:text-[#F5EDE8] shadow-xs backdrop-blur-xs">
-                    {tpl.isPremium ? 'Mẫu Premium' : 'Mẫu Miễn Phí'}
-                  </span>
+                  {tpl.isPremium ? (
+                    <span className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wider text-white shadow" style={{ background: 'linear-gradient(135deg,#E8546F,#C76A82,#D4A73C)' }}>
+                      👑 PRO
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/95 dark:bg-[#1F1A1F]/90 text-[#453C45] dark:text-[#F5EDE8] shadow-xs backdrop-blur-xs">
+                      Miễn Phí
+                    </span>
+                  )}
                 </div>
                 <SampleAlbumStack template={tpl} className="absolute bottom-3 right-3" />
               </div>
